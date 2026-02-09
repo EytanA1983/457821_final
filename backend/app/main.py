@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from app.config import settings
 from app.db.base import Base
 from app.db.session import engine
-from app.api import auth, categories, rooms, tasks, todos, google_calendar, notifications, ws, audit, recurring_tasks, statistics, sharing, email, ai, drag_drop, ml, health, csp_report
+from app.api import auth, categories, rooms, tasks, todos, google_calendar, notifications, ws, audit, recurring_tasks, statistics, sharing, email, ai, drag_drop, ml, health, csp_report, shopping
 from app.services.rate_limiter import rate_limiter
 from app.core.logging import setup_logging, logger, log_request
 from app.core.metrics import setup_prometheus_metrics
@@ -75,29 +75,33 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Trusted Host Middleware - Protects against Host header attacks
-# Must be first (before other middleware)
-if settings.SECURITY_HEADERS_ENABLED and settings.TRUSTED_HOSTS != ["*"]:
-    app.add_middleware(
-        create_trusted_host_middleware(settings.TRUSTED_HOSTS)
-    )
-
-# CORS middleware - Enhanced for HTTPS support
+# CORS middleware - MUST be FIRST to handle preflight requests
 # IMPORTANT: allow_credentials=True is required for cookies to work
+# FastAPI's CORSMiddleware automatically handles both OPTIONS (preflight) and actual requests
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "http://localhost:5178",
+        "http://localhost:5173",  # Vite default port
+        "http://localhost:5178",   # Custom Vite port
         "http://127.0.0.1:3000",
-        "http://127.0.0.1:5178",
+        "http://127.0.0.1:5173",   # Vite default port
+        "http://127.0.0.1:5178",    # Custom Vite port
         *settings.CORS_ORIGINS,  # Include production origins from settings
     ],
     allow_credentials=True,  # Required for cookies (SameSite=Strict, Secure, HttpOnly)
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],  # Explicit methods including OPTIONS
+    allow_headers=["*"],  # Allow all headers
     expose_headers=["*"],  # Expose headers for CORS
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
+
+# Trusted Host Middleware - Protects against Host header attacks
+# Must be after CORS to allow preflight requests
+if settings.SECURITY_HEADERS_ENABLED and settings.TRUSTED_HOSTS != ["*"]:
+    app.add_middleware(
+        create_trusted_host_middleware(settings.TRUSTED_HOSTS)
+    )
 
 # Security Headers Middleware (Helmet-style)
 # Adds X-Content-Type-Options, X-Frame-Options, HSTS, CSP, etc.
@@ -135,13 +139,36 @@ app.add_middleware(LoggingMiddleware)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# Global exception handler to ensure CORS headers are always present, even on errors
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    Global exception handler that ensures CORS headers are always present,
+    even when unhandled exceptions occur.
+    Note: HTTPException is handled by FastAPI automatically with CORS headers.
+    """
+    from fastapi.exceptions import HTTPException
+    
+    # Don't handle HTTPException - FastAPI handles it automatically with CORS
+    if isinstance(exc, HTTPException):
+        raise exc
+    
+    # Log the exception
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    
+    # Return error response - CORS middleware will add headers automatically
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
 # Global rate limiting middleware (optional - can be disabled if using decorators only)
 if settings.RATE_LIMIT_ENABLED:
     @app.middleware("http")
     async def global_rate_limit_middleware(request: Request, call_next):
         """Apply global rate limiting to all requests"""
-        # Skip rate limiting for health check and docs
-        if request.url.path in ["/health", "/docs", "/redoc", "/openapi.json", "/openapi.yaml"]:
+        # Skip rate limiting for OPTIONS (CORS preflight), health check and docs
+        if request.method == "OPTIONS" or request.url.path in ["/health", "/docs", "/redoc", "/openapi.json", "/openapi.yaml"]:
             return await call_next(request)
 
         # Apply global rate limit if configured
@@ -162,16 +189,15 @@ if settings.RATE_LIMIT_ENABLED:
                 return _rate_limit_exceeded_handler(request, e)
 
         return await call_next(request)
-    return response
 
 # Include routers
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(categories.router, prefix="/api", tags=["categories"])
 app.include_router(rooms.router, prefix="/api", tags=["rooms"])
-app.include_router(tasks.router)
-app.include_router(todos.router)
+app.include_router(tasks.router)  # Already has /api/tasks prefix
+app.include_router(todos.router)  # Already has /api/todos prefix
 app.include_router(google_calendar.router, prefix="/api", tags=["google-calendar"])
-app.include_router(notifications.router)
+app.include_router(notifications.router)  # Already has /api/notifications prefix
 app.include_router(ws.router)
 app.include_router(audit.router, prefix="/api", tags=["audit"])
 app.include_router(recurring_tasks.router, prefix="/api", tags=["recurring-tasks"])
@@ -181,6 +207,7 @@ app.include_router(email.router, prefix="/api", tags=["email"])
 app.include_router(ai.router, prefix="/api", tags=["ai"])
 app.include_router(ml.router, prefix="/api", tags=["ml"])
 app.include_router(drag_drop.router, prefix="/api", tags=["drag-drop"])
+app.include_router(shopping.router)  # Already has /api/shopping prefix
 app.include_router(health.router, tags=["health"])  # Health checks at root level
 app.include_router(csp_report.router, prefix="/api", tags=["security"])  # CSP violation reporting
 

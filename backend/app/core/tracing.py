@@ -44,6 +44,8 @@ def setup_tracing(
 ) -> bool:
     """
     Setup OpenTelemetry distributed tracing.
+    
+    Returns False if opentelemetry is not installed (optional dependency).
 
     Args:
         app: FastAPI application instance

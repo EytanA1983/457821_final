@@ -11,6 +11,7 @@ import sys
 import json
 import uuid
 import logging
+import threading
 from pathlib import Path
 from typing import Any, Dict, Optional
 from datetime import datetime
@@ -20,6 +21,9 @@ import time
 
 from loguru import logger
 from app.config import settings
+
+# Thread-local flag to prevent recursion in logging
+_logging_recursion_guard = threading.local()
 
 # Context variable for request correlation ID
 correlation_id_var: ContextVar[str] = ContextVar("correlation_id", default="")
@@ -48,47 +52,115 @@ class InterceptHandler(logging.Handler):
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
+# Thread-local flag to prevent recursion in logging
+_logging_recursion_guard = threading.local()
+
 def correlation_id_filter(record):
     """Add correlation ID to log records"""
-    record["extra"]["correlation_id"] = correlation_id_var.get() or str(uuid.uuid4())[:8]
-    record["extra"]["request_context"] = request_context_var.get()
+    # Prevent recursion
+    if getattr(_logging_recursion_guard, 'active', False):
+        return True
+    
+    try:
+        _logging_recursion_guard.active = True
+        record["extra"]["correlation_id"] = correlation_id_var.get() or str(uuid.uuid4())[:8]
+        request_ctx = request_context_var.get()
+        # Only add if it's a simple dict (not circular)
+        if isinstance(request_ctx, dict) and len(str(request_ctx)) < 1000:
+            record["extra"]["request_context"] = request_ctx
+        else:
+            record["extra"]["request_context"] = {}
+    finally:
+        _logging_recursion_guard.active = False
     return True
 
 
 def json_serializer(record) -> str:
     """Custom JSON serializer for structured logs"""
-    log_record = {
-        "@timestamp": datetime.utcnow().isoformat() + "Z",
-        "level": record["level"].name,
-        "message": record["message"],
-        "logger": record["name"],
-        "module": record["module"],
-        "function": record["function"],
-        "line": record["line"],
-        "correlation_id": record["extra"].get("correlation_id", ""),
-        "service": settings.PROJECT_NAME,
-        "environment": "production" if not settings.DEBUG else "development",
-    }
+    # Prevent recursion
+    if getattr(_logging_recursion_guard, 'active', False):
+        return json.dumps({"message": str(record.get("message", "Logging error"))}, ensure_ascii=False)
     
-    # Add extra fields
-    for key, value in record["extra"].items():
-        if key not in ["correlation_id", "request_context"]:
-            log_record[key] = value
-    
-    # Add request context if available
-    request_ctx = record["extra"].get("request_context", {})
-    if request_ctx:
-        log_record["request"] = request_ctx
-    
-    # Add exception info if present
-    if record["exception"]:
-        log_record["exception"] = {
-            "type": record["exception"].type.__name__ if record["exception"].type else None,
-            "value": str(record["exception"].value) if record["exception"].value else None,
-            "traceback": record["exception"].traceback if record["exception"].traceback else None,
+    try:
+        _logging_recursion_guard.active = True
+        # Safely extract level name
+        level_name = "INFO"
+        try:
+            level_obj = record.get("level")
+            if hasattr(level_obj, "name"):
+                level_name = level_obj.name
+            elif isinstance(level_obj, str):
+                level_name = level_obj
+        except Exception:
+            pass
+        
+        # Safely get extra dict
+        extra = record.get("extra", {})
+        
+        log_record = {
+            "@timestamp": datetime.utcnow().isoformat() + "Z",
+            "level": level_name,
+            "message": str(record.get("message", ""))[:1000],  # Limit message length
+            "logger": str(record.get("name", ""))[:100],
+            "module": str(record.get("module", ""))[:100],
+            "function": str(record.get("function", ""))[:100],
+            "line": int(record.get("line", 0)),
+            "correlation_id": str(extra.get("correlation_id", ""))[:50],
+            "service": str(settings.PROJECT_NAME)[:100],
+            "environment": "production" if not settings.DEBUG else "development",
         }
-    
-    return json.dumps(log_record, ensure_ascii=False, default=str)
+        
+        # Add extra fields (safely - only simple types)
+        for key, value in extra.items():
+            if key not in ["correlation_id", "request_context", "serialized"]:
+                try:
+                    # Only serialize simple types
+                    if isinstance(value, (str, int, float, bool, type(None))):
+                        log_record[str(key)[:50]] = value
+                    else:
+                        str_value = str(value)
+                        if len(str_value) < 500:
+                            log_record[str(key)[:50]] = str_value
+                        else:
+                            log_record[str(key)[:50]] = str_value[:500] + "..."
+                except Exception:
+                    log_record[str(key)[:50]] = "<unserializable>"
+        
+        # Add request context if available (safely - only simple types)
+        request_ctx = extra.get("request_context", {})
+        if isinstance(request_ctx, dict):
+            try:
+                simple_ctx = {}
+                for k, v in request_ctx.items():
+                    if isinstance(v, (str, int, float, bool, type(None))):
+                        simple_ctx[str(k)[:50]] = v
+                    else:
+                        simple_ctx[str(k)[:50]] = str(v)[:200]
+                if simple_ctx:
+                    log_record["request"] = simple_ctx
+            except Exception:
+                pass
+        
+        # Add exception info if present (safely)
+        if record.get("exception"):
+            try:
+                exc = record["exception"]
+                exc_dict = {}
+                if hasattr(exc, "type") and exc.type:
+                    exc_dict["type"] = str(exc.type.__name__)
+                if hasattr(exc, "value") and exc.value:
+                    exc_dict["value"] = str(exc.value)[:500]
+                if exc_dict:
+                    log_record["exception"] = exc_dict
+            except Exception:
+                pass
+        
+        return json.dumps(log_record, ensure_ascii=False, default=str)
+    except Exception as e:
+        # If serialization fails, return minimal safe JSON
+        return json.dumps({"message": "Logging serialization error", "error": str(e)[:200]}, ensure_ascii=False)
+    finally:
+        _logging_recursion_guard.active = False
 
 
 def setup_cloudwatch_handler():
@@ -191,7 +263,15 @@ def setup_logging():
         log_format = "{extra[serialized]}"
         
         def json_formatter(record):
-            record["extra"]["serialized"] = json_serializer(record)
+            """Format record as JSON string"""
+            try:
+                record["extra"]["serialized"] = json_serializer(record)
+            except Exception:
+                # Fallback if serialization fails
+                record["extra"]["serialized"] = json.dumps({
+                    "message": str(record.get("message", "Logging error"))[:500],
+                    "error": "Serialization failed"
+                }, ensure_ascii=False)
             return "{extra[serialized]}\n"
     else:
         # Human-readable format for console
@@ -207,24 +287,24 @@ def setup_logging():
     # Console handler (always enabled)
     logger.add(
         sys.stdout,
-        format=json_formatter or log_format,
+        format=json_formatter if json_formatter else log_format,
         level=settings.LOG_LEVEL,
         colorize=settings.LOG_FORMAT.lower() != "json",
-        backtrace=True,
-        diagnose=settings.DEBUG,
+        backtrace=False,  # Disable to prevent recursion
+        diagnose=False,  # Disable to prevent recursion
         filter=correlation_id_filter,
     )
 
     # File handler - All logs
     logger.add(
         log_dir / "app_{time:YYYY-MM-DD}.log",
-        format=json_formatter or log_format,
+        format=json_formatter if json_formatter else log_format,
         level=settings.LOG_LEVEL,
         rotation=settings.LOG_ROTATION,
         retention=settings.LOG_RETENTION,
         compression=settings.LOG_COMPRESSION if settings.LOG_COMPRESSION else None,
-        backtrace=True,
-        diagnose=settings.DEBUG,
+        backtrace=False,  # Disable backtrace to prevent recursion
+        diagnose=False,  # Disable diagnose to prevent recursion
         encoding="utf-8",
         filter=correlation_id_filter,
     )
@@ -232,32 +312,19 @@ def setup_logging():
     # File handler - Errors only
     logger.add(
         log_dir / "errors_{time:YYYY-MM-DD}.log",
-        format=json_formatter or log_format,
+        format=json_formatter if json_formatter else log_format,
         level="ERROR",
         rotation=settings.LOG_ROTATION,
         retention=settings.LOG_RETENTION,
         compression=settings.LOG_COMPRESSION if settings.LOG_COMPRESSION else None,
-        backtrace=True,
-        diagnose=True,  # Always diagnose errors
+        backtrace=False,  # Disable backtrace to prevent recursion
+        diagnose=False,  # Disable diagnose to prevent recursion
         encoding="utf-8",
         filter=correlation_id_filter,
     )
 
-    # File handler - JSON format for ELK/Loki
-    if settings.LOG_FORMAT.lower() == "json":
-        logger.add(
-            log_dir / "json_{time:YYYY-MM-DD}.log",
-            format=json_serializer,
-            level=settings.LOG_LEVEL,
-            rotation=settings.LOG_ROTATION,
-            retention=settings.LOG_RETENTION,
-            compression=settings.LOG_COMPRESSION if settings.LOG_COMPRESSION else None,
-            backtrace=True,
-            diagnose=settings.DEBUG,
-            encoding="utf-8",
-            serialize=True,
-            filter=correlation_id_filter,
-        )
+    # File handler - JSON format for ELK/Loki (removed - using json_formatter above)
+    # This was causing issues, so we use json_formatter instead
 
     # Setup CloudWatch handler (if configured)
     cloudwatch_handler = setup_cloudwatch_handler()

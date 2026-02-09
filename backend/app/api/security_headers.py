@@ -73,6 +73,10 @@ class SecureHeadersMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Add security headers to response"""
+        # Skip security headers for OPTIONS (CORS preflight) and certain paths
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        
         response = await call_next(request)
 
         # Skip security headers for certain paths (e.g., docs, health checks)
