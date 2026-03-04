@@ -22,7 +22,7 @@
 body{
   background-color: var(--bg);
   background-image:
-    linear-gradient(rgba(250, 249, 247, 0.72), rgba(250, 249, 247, 0.72)),
+    linear-gradient(rgba(250, 249, 247, 0.56), rgba(250, 249, 247, 0.56)),
     url("/branding/room-bg.png");
   background-size: cover;
   background-position: center;
@@ -68,9 +68,9 @@ body{
   position:sticky;
   top:0;
   z-index:50;
-  background:rgba(250,249,247,.85);
+  background: rgba(224, 216, 203, 0.9);
   backdrop-filter:blur(12px);
-  border-bottom:1px solid var(--border);
+  border-bottom:1px solid rgba(90, 78, 62, 0.22);
 }
 
 .app-topbar-inner{
@@ -517,57 +517,67 @@ body{
 .appFooter{
   position: relative;
   margin-top: 18px;
-  padding: 18px 18px 22px;
-  min-height: 180px;
+  padding: 0;
+  min-height: 64px;
   display: flex;
   align-items: flex-end;
   overflow: hidden;
-  border-top: 1px solid rgba(0,0,0,.08);
-  backdrop-filter: blur(8px);
-}
-
-.appFooter::before{
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: url("/branding/course-cover.png");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  z-index: 0;
-}
-
-.appFooter::after{
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(rgba(20, 20, 20, 0.58), rgba(20, 20, 20, 0.58));
-  z-index: 1;
+  border-top: 0;
+  background: transparent;
+  backdrop-filter: none;
 }
 
 @media (max-width: 900px) {
   :root{
-    --topbar-offset: 112px;
+    --topbar-offset: 102px;
   }
 
   .app-topbar-inner{
-    padding: 10px 14px 10px;
-    gap: 10px;
+    padding: 8px 12px;
+    gap: 8px;
+    flex-wrap: nowrap;
+    align-items: center;
   }
 
   .app-logo{
-    min-height: 94px;
+    min-height: 82px;
     justify-content: flex-start;
   }
 
   .brandLogo{
-    width: min(100%, 840px);
-    max-height: 96px;
+    width: min(100%, 760px);
+    max-height: 84px;
   }
 
   .app-actions{
-    width: 100%;
+    width: auto;
     justify-content: flex-start;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .pill-btn{
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .app-container{
+    padding: 20px 12px 44px;
+  }
+
+  .lifestyle-card{
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .roomsTabs{
+    gap: 8px;
+    padding-bottom: 6px;
+  }
+
+  .roomTab{
+    padding: 9px 12px;
+    font-size: 13px;
   }
 
   .brandStripTop {
@@ -581,5 +591,216 @@ body{
 
   .brandSlogan {
     font-size: 24px;
+  }
+}
+
+@media (max-width: 640px) {
+  :root{
+    --topbar-offset: 94px;
+  }
+
+  body{
+    background-attachment: scroll;
+    background-position: center top;
+  }
+
+  .app-topbar-inner{
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .app-logo{
+    min-height: 72px;
+  }
+
+  .brandLogo{
+    max-height: 72px;
+  }
+
+  .app-actions{
+    gap: 6px;
+  }
+
+  .pill-btn{
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+
+  .roomsNavWrap{
+    top: var(--topbar-offset);
+  }
+
+  .appFooter{
+    min-height: 48px;
+  }
+}
+
+@media (max-width: 420px) {
+  :root{
+    --topbar-offset: 88px;
+  }
+
+  .app-topbar-inner{
+    padding: 6px 8px;
+  }
+
+  .app-logo{
+    min-height: 64px;
+  }
+
+  .brandLogo{
+    max-height: 64px;
+  }
+
+  .pill-btn{
+    padding: 6px 9px;
+    font-size: 11px;
+  }
+
+  .app-container{
+    padding: 16px 10px 34px;
+  }
+}
+
+/* iPhone 12/13/14/15 portrait baseline: 390 x 844 */
+@media (max-width: 390px) {
+  :root{
+    --topbar-offset: 84px;
+  }
+
+  .app-topbar{
+    backdrop-filter: blur(8px);
+  }
+
+  .app-topbar-inner{
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .app-logo{
+    min-height: 58px;
+  }
+
+  .brandLogo{
+    max-height: 58px;
+  }
+
+  .app-actions{
+    gap: 6px;
+  }
+
+  .pill-btn{
+    padding: 6px 8px;
+    font-size: 11px;
+    line-height: 1.1;
+  }
+
+  .roomsTabs{
+    gap: 6px;
+    padding-bottom: 6px;
+  }
+
+  .roomTab{
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .app-container{
+    padding: 14px 8px calc(26px + env(safe-area-inset-bottom));
+  }
+
+  .lifestyle-card{
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .appFooter{
+    min-height: 40px;
+  }
+}
+
+/* iPhone X / 11 Pro portrait baseline: 375 x 812 */
+@media (max-width: 375px) {
+  :root{
+    --topbar-offset: 80px;
+  }
+
+  .app-topbar-inner{
+    padding: 5px 7px;
+    gap: 5px;
+  }
+
+  .app-logo{
+    min-height: 54px;
+  }
+
+  .brandLogo{
+    max-height: 54px;
+  }
+
+  .app-actions{
+    gap: 5px;
+  }
+
+  .pill-btn{
+    padding: 5px 8px;
+    font-size: 10.5px;
+  }
+
+  .roomsTabs{
+    gap: 5px;
+    padding: 2px 0 6px;
+  }
+
+  .roomTab{
+    padding: 7px 9px;
+    font-size: 11.5px;
+  }
+
+  .app-container{
+    padding: 12px 7px calc(22px + env(safe-area-inset-bottom));
+  }
+
+  .lifestyle-card{
+    padding: 12px;
+    border-radius: 14px;
+  }
+}
+
+/* Low-height phones (e.g. 375x812) and keyboard-open states */
+@media (max-width: 430px) and (max-height: 812px) {
+  :root{
+    --topbar-offset: 76px;
+  }
+
+  .app-topbar-inner{
+    padding: 5px 7px;
+    gap: 5px;
+  }
+
+  .app-logo{
+    min-height: 50px;
+  }
+
+  .brandLogo{
+    max-height: 50px;
+  }
+
+  .app-actions{
+    gap: 4px;
+  }
+
+  .pill-btn{
+    padding: 5px 7px;
+    font-size: 10px;
+  }
+
+  .roomsNavWrap{
+    top: var(--topbar-offset);
+  }
+
+  .app-container{
+    padding-top: 10px;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom));
   }
 }
