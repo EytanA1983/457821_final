@@ -1,0 +1,351 @@
+/* Card */
+.gcCard{
+  border: 1px solid rgba(0,0,0,.10);
+  background: rgba(255,255,255,.88);
+  backdrop-filter: blur(10px);
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.06);
+  overflow: hidden;
+}
+
+.gcHeader{
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(0,0,0,.08);
+  background: #fff;
+}
+
+.gcHeaderTop{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.gcControls{
+  display: grid;
+  gap: 8px;
+}
+
+.gcSegmented{
+  display: inline-flex;
+  border: 1px solid rgba(0,0,0,.12);
+  border-radius: 999px;
+  padding: 3px;
+  background: #fff;
+}
+
+.gcSegmentBtn{
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  color: rgba(0,0,0,.62);
+}
+
+.gcSegmentBtnActive{
+  background: rgba(26,115,232,.14);
+  color: #1a57c8;
+}
+
+.gcDayNav{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.gcDayNavBtn{
+  border: 1px solid rgba(0,0,0,.14);
+  background: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.gcDayNavLabel{
+  min-width: 18px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.gcTitle{
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.gcSub{
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: rgba(0,0,0,.55);
+  font-weight: 600;
+}
+
+/* Layout: time gutter + day headers + scroll grid */
+.gcWrap{
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  grid-template-rows: 48px 1fr;
+  height: 560px; /* Google-ish */
+  min-height: 0;
+}
+
+.gcCorner{
+  grid-column: 1;
+  grid-row: 1;
+  background: #fff;
+  border-bottom: 1px solid rgba(0,0,0,.08);
+  border-right: 1px solid rgba(0,0,0,.08);
+}
+
+/* Sticky day header row */
+.gcDayHeaderRow{
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(160px, 1fr));
+  background: #fff;
+  border-bottom: 1px solid rgba(0,0,0,.08);
+}
+
+.gcDayHead{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding: 10px 12px;
+  border-right: 1px solid rgba(0,0,0,.06);
+}
+
+.gcDayHeadToday{
+  background: rgba(26,115,232,.06);
+}
+
+.gcDayName{
+  font-weight: 900;
+}
+
+.gcDayDate{
+  font-size: 12px;
+  color: rgba(0,0,0,.55);
+  font-weight: 700;
+}
+
+/* Time gutter */
+.gcTimeGutter{
+  grid-column: 1;
+  grid-row: 2;
+  border-right: 1px solid rgba(0,0,0,.08);
+  background: #fff;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  min-height: 0;
+}
+
+.gcTimeGutterInner{
+  padding-top: 6px;
+}
+
+.gcTimeLabel{
+  height: 56px;              /* 1 hour = 56px */
+  font-size: 11px;
+  color: rgba(0,0,0,.45);
+  font-weight: 800;
+  padding-right: 10px;
+  display:flex;
+  align-items:flex-start;
+  justify-content:flex-end;
+  line-height: 1;
+}
+
+/* Scroll area */
+.gcGridScroll{
+  grid-column: 2;
+  grid-row: 2;
+  overflow-y: scroll;
+  overflow-x: auto;
+  scrollbar-gutter: stable both-edges;
+  background: #fff;
+  min-height: 0;
+}
+
+.gcGridScroll::-webkit-scrollbar{
+  width: 10px;
+  height: 10px;
+}
+
+.gcGridScroll::-webkit-scrollbar-track{
+  background: rgba(0,0,0,.05);
+}
+
+.gcGridScroll::-webkit-scrollbar-thumb{
+  background: rgba(26,115,232,.42);
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,.85);
+}
+
+/* Grid of days */
+.gcGrid{
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(160px, 1fr));
+  min-width: 1120px;
+  min-height: calc(56px * 15);
+}
+
+.gcGridDaily{
+  grid-template-columns: minmax(220px, 1fr);
+  min-width: 0;
+}
+
+/* Each day column: background grid lines like Google */
+.gcDayCol{
+  position: relative;
+  border-right: 1px solid rgba(0,0,0,.06);
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0,0,0,.08) 0px,
+      rgba(0,0,0,.08) 1px,
+      transparent 1px,
+      transparent 28px
+    );
+  /* 28px = half hour, since hour=56px */
+}
+
+.gcDayColToday{
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0,0,0,.08) 0px,
+      rgba(0,0,0,.08) 1px,
+      transparent 1px,
+      transparent 28px
+    ),
+    rgba(26,115,232,.03);
+}
+
+/* Now line */
+.gcNowLine{
+  position:absolute;
+  left:0;
+  right:0;
+  height: 2px;
+  background: rgba(234,67,53,.75); /* red-ish like Google */
+  z-index: 3;
+}
+
+.gcNowDot{
+  position:absolute;
+  right: -5px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(234,67,53,.95);
+}
+
+/* Event block */
+.gcEvent{
+  position:absolute;
+  left: 6px;
+  right: 6px;
+  border-radius: 10px;
+  background: rgba(26,115,232,.14);
+  border: 1px solid rgba(26,115,232,.24);
+  padding: 8px 8px 8px 34px; /* space for ✓ */
+  overflow: hidden;
+  z-index: 4;
+  box-shadow: 0 8px 18px rgba(0,0,0,.08);
+  min-width: 78px;
+}
+
+.gcEventDone{
+  opacity: .58;
+  filter: saturate(.85);
+}
+
+.gcEventCompact{
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+/* Check button */
+.gcCheckBtn{
+  position:absolute;
+  top: 6px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,.18);
+  background: rgba(255,255,255,.92);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight: 900;
+  cursor:pointer;
+  box-shadow: 0 8px 16px rgba(0,0,0,.10);
+  transition: transform .12s ease;
+  z-index: 5;
+}
+.gcCheckBtn:hover{ transform: scale(1.05); }
+.gcEventDone .gcCheckBtn{
+  border-color: rgba(39,174,96,.55);
+  color: #27ae60;
+}
+
+/* Time pill */
+.gcTimePill{
+  display:inline-flex;
+  align-items:center;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.78);
+  border: 1px solid rgba(0,0,0,.12);
+  font-size: 11px;
+  font-weight: 900;
+  color: rgba(0,0,0,.70);
+}
+
+.gcEventTitle{
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 900;
+  color: rgba(0,0,0,.82);
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow:hidden;
+}
+
+@media (max-width: 900px){
+  .gcHeaderTop{
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .gcControls{
+    justify-items: start;
+  }
+}
+
+.gcOverflowBadge{
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: rgba(26,115,232,.9);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 4px 6px;
+}

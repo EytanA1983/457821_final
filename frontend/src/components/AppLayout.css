@@ -1,0 +1,585 @@
+/* ===== Lifestyle Global Layout ===== */
+
+:root{
+  --bg:#FAF9F7;
+  --card:#FFFFFF;
+  --text:#1C1C1C;
+  --muted:#6B6B6B;
+  --accent:#A07CFE;
+  --accentSoft:#F1ECFF;
+  --border:#EAEAEA;
+
+  --radiusLg:26px;
+  --radiusMd:14px;
+
+  --shadowSm:0 6px 18px rgba(0,0,0,.05);
+  --shadowMd:0 20px 60px rgba(0,0,0,.08);
+
+  --container:1100px;
+  --topbar-offset: 138px;
+}
+
+body{
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(rgba(250, 249, 247, 0.72), rgba(250, 249, 247, 0.72)),
+    url("/branding/room-bg.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  color:var(--text);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+.appPageBg{
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;
+}
+
+.appPageBg::before{
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(250, 249, 247, 0.72), rgba(250, 249, 247, 0.72)),
+    url("/branding/room-bg.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 1;
+}
+
+.appPageBg::after{
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: rgba(250, 249, 247, 0.08);
+}
+
+/* ===== Top Bar ===== */
+
+.app-topbar{
+  position:sticky;
+  top:0;
+  z-index:50;
+  background:rgba(250,249,247,.85);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+}
+
+.app-topbar-inner{
+  max-width:var(--container);
+  margin:0 auto;
+  padding:12px 18px 10px;
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.app-logo{
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 132px;
+  flex: 1;
+  min-width: 0;
+}
+
+.brandLogo{
+  width: min(100%, 1120px);
+  height: auto;
+  max-height: 130px;
+  object-fit: contain;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  display: block;
+}
+
+.roomsNavWrap {
+  position: sticky;
+  top: var(--topbar-offset);
+  z-index: 39;
+
+  background: rgba(250, 249, 247, 0.85);
+  backdrop-filter: blur(10px);
+
+  border-bottom: 1px solid var(--border);
+}
+
+.app-actions{
+  display:flex;
+  width: auto;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap:10px;
+  flex-shrink: 0;
+}
+
+.pill-btn{
+  padding:10px 16px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:#fff;
+  box-shadow:var(--shadowSm);
+  font-weight:600;
+  transition:.2s ease;
+}
+
+.pill-btn:hover{
+  transform:translateY(-2px);
+}
+
+.pill-btn-accent{
+  background:var(--accentSoft);
+  border-color:rgba(160,124,254,.35);
+  color:#4A2BC7;
+}
+
+/* ===== Container ===== */
+
+.app-container{
+  max-width:var(--container);
+  margin:0 auto;
+  padding:28px 18px 60px;
+}
+
+/* ===== Cards ===== */
+
+.lifestyle-card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--radiusLg);
+  padding:22px;
+  box-shadow:var(--shadowSm);
+}
+
+.lifestyle-title{
+  font-family:"Playfair Display", serif;
+  font-size:22px;
+  margin-bottom:8px;
+}
+
+.lifestyle-muted{
+  color:var(--muted);
+  font-size:14px;
+}
+
+/* --- Premium Tabs UX --- */
+
+/* container של הטאבים: fade בקצוות */
+.roomsTabs {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+
+  /* מסתיר scrollbar בצורה עדינה */
+  scrollbar-width: none;
+}
+.roomsTabs::-webkit-scrollbar { display: none; }
+
+/* fade edges */
+.roomsTabs::before,
+.roomsTabs::after {
+  content: "";
+  position: sticky;
+  top: 0;
+  width: 18px;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+.roomsTabs::before {
+  left: 0;
+  background: linear-gradient(90deg, rgba(250,249,247,0.95), rgba(250,249,247,0));
+}
+.roomsTabs::after {
+  right: 0;
+  background: linear-gradient(270deg, rgba(250,249,247,0.95), rgba(250,249,247,0));
+}
+
+/* tab: snap + micro interaction */
+.roomTab {
+  scroll-snap-align: start;
+  flex: 0 0 auto;
+
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  font-weight: 700;
+
+  box-shadow: 0 6px 18px rgba(0,0,0,0.04);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease;
+}
+
+.roomTab:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 34px rgba(0,0,0,0.07);
+  border-color: rgba(160,124,254,0.25);
+}
+
+/* active pill: יותר פרימיום + "glow" עדין */
+.roomTabActive {
+  background: var(--accentSoft);
+  color: #4A2BC7;
+  border-color: rgba(160,124,254,0.45);
+  box-shadow: 0 16px 40px rgba(160,124,254,0.18);
+}
+
+/* פוקוס למקלדת (נגישות) */
+.roomTab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 6px rgba(160,124,254,0.14), 0 14px 34px rgba(0,0,0,0.07);
+  border-color: rgba(160,124,254,0.55);
+}
+
+.roomTabLocked{
+  opacity: 0.72;
+}
+.roomTabLocked:hover{
+  opacity: 1;
+}
+
+.roomsDrawerTrigger {
+  background: var(--accentSoft);
+  color: #4A2BC7;
+  border-color: rgba(160,124,254,0.35);
+}
+
+.roomsDrawerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(28, 28, 28, 0.28);
+  backdrop-filter: blur(2px);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.roomsDrawerPanel {
+  width: min(420px, 92vw);
+  height: 100%;
+  background: var(--card);
+  border-left: 1px solid var(--border);
+  box-shadow: -20px 0 60px rgba(0, 0, 0, 0.12);
+  padding: 20px 16px;
+  overflow-y: auto;
+}
+
+.roomsDrawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.roomsDrawerList {
+  display: grid;
+  gap: 10px;
+}
+
+.roomsDrawerItem {
+  display: block;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-weight: 600;
+  color: var(--text);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.roomsDrawerItem:hover {
+  transform: translateY(-1px);
+  border-color: rgba(160, 124, 254, 0.28);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+}
+
+.roomsDrawerItemActive {
+  background: var(--accentSoft);
+  color: #4A2BC7;
+  border-color: rgba(160, 124, 254, 0.45);
+}
+
+.brandStrip {
+  margin-bottom: 18px;
+}
+
+.brandStripTop {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.brandSlogan {
+  font-size: 28px;
+  margin-bottom: 6px;
+}
+
+.brandSubline {
+  margin: 0;
+}
+
+.brandMetaRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.brandMetaCard {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.brandMetaText {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.focusTimerWrap {
+  display: grid;
+  gap: 12px;
+}
+
+.focusTimerIntro {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.focusTimerLabel {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.focusTimerSelect {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-height: 42px;
+  padding: 8px 10px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.focusTimerPresets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.focusPresetBtn {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.focusPresetBtnActive {
+  background: var(--accentSoft);
+  border-color: rgba(160, 124, 254, 0.45);
+  color: #4A2BC7;
+}
+
+.focusTimerClock {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.focusTimerProgress {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.focusTimerProgressBar {
+  height: 100%;
+  background: linear-gradient(90deg, #A07CFE, #7A5AE6);
+  transition: width 220ms ease;
+}
+
+.focusTimerMeta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.focusTimerSuccess {
+  margin: 0;
+  color: #1d8f53;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.focusTimerActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pageBg{
+  min-height: calc(100vh - 60px);
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.pageBg--room{
+  background-image: url("/branding/room-bg.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.pageOverlay{
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(255,255,255,.90), rgba(255,255,255,.75), rgba(255,255,255,.92));
+}
+
+.pageContent{
+  position: relative;
+  z-index: 2;
+  padding: 18px;
+}
+
+.hero{
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  min-height: 180px;
+  box-shadow: 0 14px 34px rgba(0,0,0,.10);
+  margin-bottom: 16px;
+}
+
+.hero--course{
+  background-image: url("/branding/course-cover.png");
+  background-size: cover;
+  background-position: center;
+}
+
+.heroOverlay{
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to left, rgba(0,0,0,.45), rgba(0,0,0,.10));
+}
+
+.heroInner{
+  position: relative;
+  z-index: 2;
+  padding: 20px 18px;
+  color: #fff;
+}
+
+.heroInner h1{
+  margin: 0;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.heroInner p{
+  margin: 8px 0 0;
+  font-size: 13px;
+  opacity: .92;
+  font-weight: 600;
+}
+
+.appFooter{
+  position: relative;
+  margin-top: 18px;
+  padding: 18px 18px 22px;
+  min-height: 180px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  border-top: 1px solid rgba(0,0,0,.08);
+  backdrop-filter: blur(8px);
+}
+
+.appFooter::before{
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("/branding/course-cover.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 0;
+}
+
+.appFooter::after{
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(20, 20, 20, 0.58), rgba(20, 20, 20, 0.58));
+  z-index: 1;
+}
+
+@media (max-width: 900px) {
+  :root{
+    --topbar-offset: 112px;
+  }
+
+  .app-topbar-inner{
+    padding: 10px 14px 10px;
+    gap: 10px;
+  }
+
+  .app-logo{
+    min-height: 94px;
+    justify-content: flex-start;
+  }
+
+  .brandLogo{
+    width: min(100%, 840px);
+    max-height: 96px;
+  }
+
+  .app-actions{
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .brandStripTop {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .brandMetaRow {
+    grid-template-columns: 1fr;
+  }
+
+  .brandSlogan {
+    font-size: 24px;
+  }
+}
