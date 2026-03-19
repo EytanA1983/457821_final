@@ -1,0 +1,42 @@
+:root {
+  /* KonMari-inspired palette */
+  --bg-primary: #FAF9F7;
+  --bg-card: #FFFFFF;
+  --text-primary: #1C1C1C;
+  --text-secondary: #6B6B6B;
+  --accent-primary: #A07CFE;
+  --accent-soft: #EFE9FF;
+  --success: #6BBF8A;
+  --warning: #E6B655;
+  --danger: #D96B6B;
+  --border-soft: #EAEAEA;
+
+  /* App semantic aliases */
+  --color-bg: var(--bg-primary);
+  --color-surface: var(--bg-card);
+  --color-border: var(--border-soft);
+  --color-border-strong: #dbd4ef;
+  --color-primary: var(--accent-primary);
+  --color-primary-soft: var(--accent-soft);
+  --color-text: var(--text-primary);
+  --color-text-muted: var(--text-secondary);
+
+  /* RADIUS */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+
+  /* SHADOW */
+  --shadow-card: 0 6px 16px rgba(0,0,0,0.06);
+
+  /* SPACING */
+  --space-xs: 6px;
+  --space-sm: 10px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* FONT */
+  --font-main: 'Inter', 'Assistant', system-ui, sans-serif;
+  --font-heading: 'Playfair Display', 'Cormorant', 'Assistant', serif;
+}

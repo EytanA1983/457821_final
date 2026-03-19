@@ -1,154 +1,114 @@
-import { memo, useCallback, useEffect, useMemo } from 'react';
-import { useQueryClient, useMutation } from '@tanstack/react-query';
-import api from '../api';
-import { TaskItem, TaskItemSkeleton } from './TaskItem';
-import { sendWs } from '../utils/ws';
-import { useTasks } from '../hooks/useTasks';
-import { useVoice } from '../hooks/useVoice';
+import { useMemo } from "react";
+import api from "../api";
+import { useTasks } from "../hooks/useTasks";
+import TaskItem from "./TaskItem";
+import type { TaskRead } from "../schemas/task";
+import { useTranslation } from "react-i18next";
+import { useQueryClient } from "@tanstack/react-query";
 
-type Props = {
+interface Task {
+  id: string;
+  title: string;
+  completed: boolean;
+  room_id?: string;
+  scope?: string;
+}
+
+interface TaskListProps {
+  tasks?: Task[];
+  onTaskToggle?: (id: string) => void;
   filter?: {
     roomId?: number;
     categoryId?: number;
   };
-};
+}
 
-/**
- * TaskList component - displays a list of tasks
- * Optimized with React.memo and useCallback to prevent unnecessary re-renders
- */
-const TaskListComponent = ({ filter }: Props) => {
-  const { speak } = useVoice();
+const TaskList = ({
+  tasks = [],
+  onTaskToggle,
+  filter,
+}: TaskListProps) => {
+  const { i18n } = useTranslation();
+  const isEnglish = (i18n.resolvedLanguage || i18n.language || "he").startsWith("en");
+  const ui = isEnglish
+    ? {
+        fallbackTask: "Task",
+        loading: "Loading tasks...",
+        empty: "No tasks here right now",
+        emptyHint: "This is a great moment to add one small task.",
+      }
+    : {
+        fallbackTask: "משימה",
+        loading: "טוען משימות...",
+        empty: "אין משימות כאן כרגע",
+        emptyHint: "אולי זה זמן מושלם להוסיף משימה קטנה שתיצור שקט גדול.",
+      };
   const queryClient = useQueryClient();
+  const { data: fetchedTasks = [], isLoading } = useTasks(filter);
 
-  // Memoize filter to prevent unnecessary refetches
-  const stableFilter = useMemo(() => ({
-    roomId: filter?.roomId,
-    categoryId: filter?.categoryId,
-  }), [filter?.roomId, filter?.categoryId]);
+  const effectiveTasks = useMemo<Task[]>(() => {
+    if (tasks.length > 0) return tasks;
 
-  // Use useTasks hook with stable filter
-  const { data: tasks = [], isLoading, error } = useTasks(stableFilter);
+    return (fetchedTasks as TaskRead[]).map((task) => ({
+      id: String(task.id),
+      title: task.title ?? ui.fallbackTask,
+      completed: Boolean(task.completed),
+      room_id: task.room_id ? String(task.room_id) : undefined,
+      scope: (task as TaskRead & { scope?: string }).scope,
+    }));
+  }, [tasks, fetchedTasks, ui.fallbackTask]);
 
-  // WebSocket connection for real-time updates
-  useEffect(() => {
-    let cleanup: (() => void) | undefined;
+  const handleToggle = async (id: string) => {
+    if (onTaskToggle) {
+      onTaskToggle(id);
+      return;
+    }
 
-    const onMessage = (msg: any) => {
-      if (msg.type === 'task-updated' || msg.type === 'task-completed') {
-        // Invalidate tasks query to refetch
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      }
-    };
+    const current = effectiveTasks.find((t) => t.id === id);
+    if (!current) return;
 
-    // Connect to WebSocket
-    import('../utils/ws').then(({ connectWs }) => {
-      cleanup = connectWs(onMessage);
-    });
+    const numericId = Number(id);
+    if (!Number.isFinite(numericId)) return;
 
-    return () => {
-      if (cleanup) cleanup();
-    };
-  }, [queryClient]); // Remove filter from dependencies to prevent reconnection
+    try {
+      await api.put(`/tasks/${numericId}`, { completed: !current.completed });
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    } catch (error) {
+      console.error("[TaskList] Failed to toggle task:", error);
+    }
+  };
 
-  // Mutation for toggling task completion (memoized via useMutation)
-  const toggleCompleteMutation = useMutation({
-    mutationFn: async ({ taskId, completed }: { taskId: number; completed: boolean }) => {
-      const response = await api.put(`/api/tasks/${taskId}`, { completed: !completed });
-      return response.data;
-    },
-    onSuccess: (data, variables) => {
-      // Voice feedback only when task is completed
-      if (!variables.completed) {
-        speak('המשימה הוסמה כהושלמה');
-      }
-
-      // Send WebSocket message
-      sendWs({
-        type: 'task-completed',
-        payload: { taskId: variables.taskId, completed: !variables.completed }
-      });
-
-      // Invalidate and refetch tasks
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    },
-    onError: (error) => {
-      console.error('Failed to toggle task completion:', error);
-      speak('שגיאה בעדכון המשימה');
-    },
-  });
-
-  // Memoized toggle handler
-  const handleToggle = useCallback((taskId: number, completed: boolean) => {
-    toggleCompleteMutation.mutate({ taskId, completed });
-  }, [toggleCompleteMutation]);
-
-  // Memoized refresh function for TodoItem onChange
-  const refreshTasks = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['tasks'] });
-  }, [queryClient]);
-
-  // Loading state
-  if (isLoading) {
+  if (isLoading && tasks.length === 0) {
     return (
-      <div className="space-y-4">
-        <TaskItemSkeleton />
-        <TaskItemSkeleton />
-        <TaskItemSkeleton />
+      <div className="emptyState">
+        <div className="emptyTitle">{ui.loading}</div>
       </div>
     );
   }
 
-  // Error state
-  if (error) {
+  if (!effectiveTasks || effectiveTasks.length === 0) {
     return (
-      <div className="text-center py-8 text-red-500">
-        <span className="emoji text-4xl block mb-2">⚠️</span>
-        <p className="font-medium">שגיאה בטעינת משימות</p>
-        <p className="text-sm mt-1 text-gray-500">
-          {(error as Error)?.message || 'נסה לרענן את הדף'}
-        </p>
-      </div>
-    );
-  }
-
-  // Empty state
-  if (tasks.length === 0) {
-    return (
-      <div className="text-center py-8 text-gray-500 dark:text-gray-300">
-        <span className="emoji text-4xl block mb-2">📋</span>
-        <p className="font-medium">אין משימות כרגע</p>
-        <p className="text-sm mt-1">הוסף משימה חדשה להתחיל</p>
+      <div className="emptyState">
+        <div className="emptyTitle">{ui.empty}</div>
+        <div>
+          {ui.emptyHint}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {tasks.map((task) => (
+    <div className="taskList">
+      {effectiveTasks.map((task) => (
         <TaskItem
           key={task.id}
           task={task}
           onToggle={handleToggle}
-          onTodoChange={refreshTasks}
-          isPending={
-            toggleCompleteMutation.isPending &&
-            toggleCompleteMutation.variables?.taskId === task.id
-          }
+          isEnglish={isEnglish}
         />
       ))}
     </div>
   );
 };
-
-// Export with React.memo
-export const TaskList = memo(TaskListComponent, (prevProps, nextProps) => {
-  // Compare filter objects
-  return (
-    prevProps.filter?.roomId === nextProps.filter?.roomId &&
-    prevProps.filter?.categoryId === nextProps.filter?.categoryId
-  );
-});
-TaskList.displayName = 'TaskList';
 
 export default TaskList;

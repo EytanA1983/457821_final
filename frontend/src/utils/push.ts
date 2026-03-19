@@ -13,7 +13,7 @@ export const registerPush = async () => {
       applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC_KEY),
     });
 
-    await api.post('/api/notifications/subscribe', subscription);
+    await api.post('/notifications/subscribe', subscription);
     
     // שמירת endpoint ב-localStorage רק אחרי הצלחה
     localStorage.setItem('push_endpoint', subscription.endpoint);
@@ -38,7 +38,7 @@ export const unregisterPush = async (endpoint: string) => {
     }
     
     // Then notify backend
-    await api.post('/api/notifications/unsubscribe', { endpoint });
+    await api.post('/notifications/unsubscribe', { endpoint });
     
     // Remove endpoint from localStorage only after successful unsubscription
     localStorage.removeItem('push_endpoint');

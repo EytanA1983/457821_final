@@ -10,6 +10,7 @@ from app.api.deps_audit import get_audit_context
 from app.db.models import User, Room, RoomShare
 from app.schemas.sharing import (
     RoomShareCreate,
+    RoomShareByEmailCreate,
     RoomShareResponse,
     RoomShareUpdate,
     RoomWithShares,
@@ -18,6 +19,43 @@ from app.services.permissions import permission_service, Permission
 from app.core.logging import logger, log_api_call
 
 router = APIRouter(prefix="/sharing", tags=["sharing"])
+
+
+@router.post("/rooms/{room_id}/share-by-email", response_model=RoomShareResponse, status_code=status.HTTP_201_CREATED)
+def share_room_by_email(
+    request: Request,
+    room_id: int,
+    share_data: RoomShareByEmailCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    audit_context: dict = Depends(get_audit_context),
+):
+    """Share room by user email (household invitation shortcut)."""
+    target_user = db.query(User).filter(User.email == share_data.email.strip().lower()).first()
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User with this email was not found",
+        )
+
+    share = permission_service.share_room(
+        db=db,
+        room_id=room_id,
+        shared_with_user_id=target_user.id,
+        permission=share_data.permission,
+        shared_by_user_id=current_user.id,
+    )
+
+    return RoomShareResponse(
+        id=share.id,
+        room_id=share.room_id,
+        user_id=share.user_id,
+        user_email=target_user.email,
+        user_name=target_user.full_name,
+        permission=share.permission,
+        shared_by=share.shared_by,
+        created_at=share.created_at,
+    )
 
 
 @router.post("/rooms/{room_id}/share", response_model=RoomShareResponse, status_code=status.HTTP_201_CREATED)

@@ -2,7 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { visualizer } from 'rollup-plugin-visualizer'
 import { VitePWA } from 'vite-plugin-pwa'
-import { imagetools } from 'vite-imagetools'
+// vite-imagetools is ESM-only - using dynamic import
+const { imagetools } = await import('vite-imagetools')
 
 /**
  * Vite Configuration
@@ -44,7 +45,7 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icons/*.png', 'icons/*.svg', 'screenshots/*.png'],
+      includeAssets: ['favicon.ico', 'icons/*.png', 'icons/*.svg', 'screenshots/*.png', 'manifest.webmanifest'],
 
       // Manifest configuration
       manifest: {
@@ -169,20 +170,33 @@ export default defineConfig({
 
   server: {
     host: '0.0.0.0',
-    port: 5178,
+    port: 5179,
     strictPort: false,
     fs: {
       strict: false
     },
+    // Vite automatically serves .webmanifest files with correct MIME type
+    // The mime-types package (used by Vite) recognizes .webmanifest as application/manifest+json
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
-        changeOrigin: true,
-        secure: false,
+        changeOrigin: true,  // Changes the origin of the host header to the target URL
+        secure: false,  // Allow self-signed certificates if using HTTPS
+        // CRITICAL: Do NOT use rewrite - backend expects /api prefix
+        // Without rewrite: /api/auth/register → http://localhost:8000/api/auth/register ✅
+        // With rewrite: /api/auth/register → http://localhost:8000/auth/register ❌ (404)
+        // 
+        // Backend routers are defined with prefix="/api" (see backend/app/main.py)
+        // Example: app.include_router(auth.router, prefix="/api", tags=["auth"])
+        // So backend expects: http://localhost:8000/api/auth/register
+        // 
+        // rewrite: (path) => path.replace(/^\/api/, ''),  // ❌ DON'T USE - backend needs /api
       },
       '/ws': {
         target: 'ws://localhost:8000',
         ws: true,
+        changeOrigin: true,
+        secure: false,
       }
     }
   },
@@ -280,14 +294,30 @@ export default defineConfig({
       'react-i18next',
       'i18next-browser-languagedetector',
       '@tanstack/react-query',
+      'lucide-react',
+      'react-hot-toast',
     ],
+    exclude: [],
+    // Force pre-bundling to avoid warnings
+    force: false,
+    // Ensure api.ts is properly resolved
+    esbuildOptions: {
+      resolveExtensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json']
+    }
+  },
+  
+  // Ensure TypeScript files are processed correctly
+  esbuild: {
+    include: /\.tsx?$/,
     exclude: []
   },
 
   resolve: {
     alias: {
       '@': '/src'
-    }
+    },
+    // Ensure TypeScript files are resolved correctly
+    extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json']
   },
 
   // Define global constants
@@ -299,7 +329,7 @@ export default defineConfig({
 
   // Preview server config
   preview: {
-    port: 5178,
+    port: 5179,
     host: '0.0.0.0',
   },
 })

@@ -36,7 +36,8 @@ class TokenBlocklist(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
     # JWT ID - unique identifier from the token
-    jti: Mapped[str] = mapped_column(String(36), unique=True, nullable=False, index=True)
+    # Note: index is defined in __table_args__ below, not here to avoid duplicate
+    jti: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
 
     # Token type: 'access' or 'refresh'
     token_type: Mapped[str] = mapped_column(String(20), nullable=False, index=True)

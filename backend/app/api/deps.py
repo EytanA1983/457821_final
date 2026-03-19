@@ -90,10 +90,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         return user
 
     except JWTError as e:
-        logger.warning(f"JWT validation failed: {e}")
+        logger.warning(f"JWT validation failed: {e}", extra={"error_type": type(e).__name__})
         raise credentials_exception
     except HTTPException:
+        # Re-raise HTTPException directly (401/403/etc.) - don't convert to 500
         raise
     except Exception as e:
-        logger.error(f"Unexpected error in get_current_user: {e}")
+        logger.error(f"Unexpected error in get_current_user: {e}", exc_info=True, extra={"error_type": type(e).__name__})
         raise credentials_exception

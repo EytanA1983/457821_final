@@ -28,6 +28,11 @@ class SecureCookieMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Process request and enforce secure cookie settings"""
+        # Skip cookie processing for OPTIONS (CORS preflight) - no cookies needed
+        # CRITICAL: OPTIONS requests must pass through without cookie processing
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        
         response = await call_next(request)
 
         # Only modify Set-Cookie headers if they exist

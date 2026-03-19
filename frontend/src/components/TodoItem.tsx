@@ -14,17 +14,17 @@ type Props = {
  * TodoItem component with React.memo for performance
  * Prevents re-renders when parent component updates but todo hasn't changed
  */
-const TodoItemComponent = ({ todo, taskId, onChange }: Props) => {
+const TodoItemComponent = ({ todo, onChange }: Props) => {
   const { speak } = useVoice();
 
   const updateTodoMutation = useMutation({
     mutationFn: async (completed: boolean) => {
-      const response = await api.put(`/api/todos/${todo.id}`, {
+      const response = await api.put(`/todos/${todo.id}`, {
         completed,
       });
       return response.data;
     },
-    onSuccess: (data, completed) => {
+    onSuccess: (_data, completed) => {
       speak(completed ? 'תת‑משימה הושלמה' : 'ביטלת את ה‑תת‑משימה');
       onChange();
     },

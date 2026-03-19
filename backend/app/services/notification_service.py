@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-from app.models.notification import Notification, NotificationType
-from app.models.task import Task
-from app.models.user import User
+from app.db.models import Notification, NotificationType
+from app.db.models.task import Task
+from app.db.models.user import User
 from app.services.redis_pubsub import redis_pubsub
 from app.api.ws import manager
 import asyncio

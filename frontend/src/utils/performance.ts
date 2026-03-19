@@ -4,7 +4,7 @@
  * Tools for measuring and debugging React component performance
  */
 
-import { useRef, useEffect } from 'react';
+import { createElement, useEffect, useRef, useState, type ComponentType } from 'react';
 
 /**
  * Hook to track component render counts
@@ -78,15 +78,15 @@ export function useRenderTime(componentName: string): void {
  * HOC to wrap component with performance tracking
  */
 export function withPerformanceTracking<P extends object>(
-  WrappedComponent: React.ComponentType<P>,
+  WrappedComponent: ComponentType<P>,
   componentName: string
-): React.ComponentType<P> {
+): ComponentType<P> {
   return function PerformanceTrackedComponent(props: P) {
     useRenderCount(componentName);
     useWhyDidYouUpdate(componentName, props);
     useRenderTime(componentName);
     
-    return <WrappedComponent {...props} />;
+    return createElement(WrappedComponent, props);
   };
 }
 
@@ -124,9 +124,6 @@ export function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-// Need to import useState for useDebounce
-import { useState } from 'react';
-
 /**
  * Throttle a callback
  */
@@ -135,7 +132,7 @@ export function useThrottle<T extends (...args: any[]) => any>(
   delay: number
 ): T {
   const lastRan = useRef(Date.now());
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   return useRef(((...args) => {
     if (Date.now() - lastRan.current >= delay) {

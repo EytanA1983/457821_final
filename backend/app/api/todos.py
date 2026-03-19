@@ -13,13 +13,20 @@ router = APIRouter(prefix="/api/todos", tags=["todos"])
 
 @router.get("/task/{task_id}", response_model=List[TodoRead])
 def list_todos(task_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """
+    List todos (sub-tasks) for a specific task.
+    
+    Todo = רשימות משנה של Task (sub-tasks)
+    - קשור ל-Task דרך task_id
+    - משמש לרשימות משנה/צ'קליסטים בתוך משימה
+    """
     task = db.query(Task).filter(Task.id == task_id, Task.user_id == user.id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     # Order todos by position
     return sorted(task.todos, key=lambda t: (t.position or 0, t.id))
 
-@router.post("/", response_model=TodoRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=TodoRead, status_code=status.HTTP_201_CREATED)
 def create_todo(
     request: Request,
     todo_in: TodoCreate,

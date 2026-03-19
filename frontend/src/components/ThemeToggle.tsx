@@ -105,7 +105,7 @@ export const ThemeToggle: React.FC = () => {
  * Three-way toggle (Light / System / Dark)
  */
 export const ThemeToggleTriple: React.FC = () => {
-  const { theme, setTheme, resolvedTheme, systemTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const { t } = useTranslation('settings');
 
   const options: { value: Theme; label: string; icon: string }[] = [

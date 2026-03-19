@@ -1,250 +1,174 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useState, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
-import { ROUTES } from '../utils/routes';
-import { LanguageSwitcher } from './LanguageSwitcher';
-import { ThemeToggle } from './ThemeToggle';
-import { announce } from '../utils/accessibility';
+import { NavLink } from "react-router-dom";
+import { ROUTES } from "../utils/routes";
+import { useAuth } from "../hooks/useAuth";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
-/**
- * NavBar component with full accessibility support
- * - ARIA labels for all interactive elements
- * - Keyboard navigation
- * - Screen reader announcements
- * - Focus indicators
- */
-const NavBar = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { t } = useTranslation();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+export const NavBar = () => {
+  const { i18n } = useTranslation();
+  const isEnglish = (i18n.resolvedLanguage || i18n.language || "he").startsWith("en");
+  const text = isEnglish
+    ? {
+        home: "Home",
+        calendar: "Calendar",
+        rooms: "Rooms",
+        tasks: "Tasks",
+        logout: "Logout",
+        login: "Login",
+        register: "Register",
+        menu: "Menu",
+      }
+    : {
+        home: "בית",
+        calendar: "היומן",
+        rooms: "חדרים",
+        tasks: "משימות",
+        logout: "יציאה",
+        login: "התחבר",
+        register: "רישום",
+        menu: "תפריט",
+      };
+  const { isAuthenticated, logout } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    setIsAuthenticated(!!token);
-  }, [location]);
+  const handleLogout = () => {
+    setMobileMenuOpen(false);
+    logout();
+  };
 
-  // Announce page changes to screen readers
-  useEffect(() => {
-    const pageName = navItems.find(item => item.path === location.pathname)?.translationKey;
-    if (pageName) {
-      announce(`עמוד ${t(pageName)} נטען`, 'polite');
-    }
-  }, [location.pathname, t]);
-
-  const handleLogout = useCallback(() => {
-    localStorage.removeItem('token');
-    setIsAuthenticated(false);
-    announce('התנתקת בהצלחה', 'assertive');
-    navigate(ROUTES.LOGIN);
-  }, [navigate]);
-
-  const toggleMobileMenu = useCallback(() => {
-    setIsMobileMenuOpen(prev => {
-      announce(prev ? 'תפריט נסגר' : 'תפריט נפתח', 'polite');
-      return !prev;
-    });
-  }, []);
-
-  const navItems = [
-    { path: ROUTES.HOME, icon: '🏠', translationKey: 'rooms.title', ariaLabel: 'דף הבית' },
-    { path: ROUTES.CALENDAR, icon: '📅', translationKey: 'calendar.title', ariaLabel: 'לוח שנה' },
-    { path: ROUTES.SETTINGS, icon: '⚙️', translationKey: 'settings.title', ariaLabel: 'הגדרות' },
-  ];
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+  };
 
   return (
-    <header role="banner">
-      <nav 
-        className="bg-white dark:bg-dark-surface shadow-sm border-b border-gray-200 dark:border-dark-border"
-        role="navigation"
-        aria-label="ניווט ראשי"
-      >
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo/Brand */}
-            <Link 
-              to={ROUTES.HOME} 
-              className="text-2xl font-bold text-gray-900 dark:text-dark-text hover:text-sky transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2 rounded-lg px-2 py-1"
-              aria-label={`${t('common.app_name')} - חזרה לדף הבית`}
-            >
-              <span aria-hidden="true">🏡</span>
-              <span className="mr-2">{t('common.app_name')}</span>
-            </Link>
-            
-            {/* Mobile menu button */}
-            <button
-              type="button"
-              className="md:hidden p-2 rounded-lg text-gray-700 dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
-              onClick={toggleMobileMenu}
-              aria-expanded={isMobileMenuOpen}
-              aria-controls="mobile-menu"
-              aria-label={isMobileMenuOpen ? 'סגור תפריט' : 'פתח תפריט'}
-            >
-              <span className="sr-only">{isMobileMenuOpen ? 'סגור תפריט' : 'פתח תפריט'}</span>
-              <span className="emoji text-xl" aria-hidden="true">
-                {isMobileMenuOpen ? '✕' : '☰'}
-              </span>
-            </button>
-            
-            {/* Desktop navigation */}
-            <div 
-              className="hidden md:flex items-center gap-2"
-              role="menubar"
-              aria-label="תפריט ניווט"
-            >
-              <ThemeToggle />
-              <LanguageSwitcher />
-              
-              {isAuthenticated ? (
-                <>
-                  {navItems.map((item) => {
-                    const isActive = location.pathname === item.path;
-                    return (
-                      <Link
-                        key={item.path}
-                        to={item.path}
-                        className={`
-                          flex items-center gap-2 px-4 py-2 rounded-lg transition-colors
-                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2
-                          ${isActive
-                            ? 'bg-mint text-white'
-                            : 'text-gray-700 dark:text-dark-text hover:bg-cream dark:hover:bg-dark-bg'
-                          }
-                        `}
-                        role="menuitem"
-                        aria-current={isActive ? 'page' : undefined}
-                        aria-label={item.ariaLabel}
-                      >
-                        <span className="emoji" aria-hidden="true">{item.icon}</span>
-                        <span>{t(item.translationKey || 'common.app_name')}</span>
-                      </Link>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 dark:text-dark-text hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
-                    role="menuitem"
-                    aria-label="התנתק מהחשבון"
-                  >
-                    <span className="emoji" aria-hidden="true">🚪</span>
-                    <span>{t('auth.logout')}</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link
-                    to={ROUTES.LOGIN}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-gray-700 dark:text-dark-text hover:bg-cream dark:hover:bg-dark-bg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"
-                    role="menuitem"
-                    aria-label="התחבר לחשבון קיים"
-                  >
-                    <span className="emoji" aria-hidden="true">🔑</span>
-                    <span>{t('auth.login')}</span>
-                  </Link>
-                  <Link
-                    to={ROUTES.REGISTER}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-sky text-white hover:bg-sky/90 dark:bg-sky/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"
-                    role="menuitem"
-                    aria-label="צור חשבון חדש"
-                  >
-                    <span className="emoji" aria-hidden="true">📝</span>
-                    <span>{t('auth.register')}</span>
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
-          
-          {/* Mobile navigation */}
-          <div
-            id="mobile-menu"
-            className={`md:hidden ${isMobileMenuOpen ? 'block' : 'hidden'}`}
-            role="menu"
-            aria-label="תפריט נייד"
+    <nav className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 py-2 px-4 border border-gray-200 dark:border-gray-700 rounded-xl safe-top" dir={isEnglish ? "ltr" : "rtl"}>
+      {/* Desktop & Mobile Header */}
+      <div className="flex justify-between items-center">
+        {/* לוגו / שם האפליקציה */}
+        <NavLink 
+          to={ROUTES.HOME} 
+          className="text-base sm:text-lg font-semibold touch-target"
+          onClick={closeMobileMenu}
+        >
+          {text.home}
+        </NavLink>
+
+        {/* Desktop Menu - focused navigation */}
+        <div className="hidden md:flex items-center space-x-4 space-x-reverse">
+          <NavLink 
+            to={ROUTES.CALENDAR} 
+            className="touch-target px-3 py-1 rounded transition-colors hover:bg-blue-50 dark:hover:bg-gray-700"
           >
-            <div className="py-2 space-y-1 border-t border-gray-200 dark:border-dark-border">
-              {isAuthenticated ? (
-                <>
-                  {navItems.map((item) => {
-                    const isActive = location.pathname === item.path;
-                    return (
-                      <Link
-                        key={item.path}
-                        to={item.path}
-                        className={`
-                          flex items-center gap-2 px-4 py-3 rounded-lg transition-colors
-                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky
-                          ${isActive
-                            ? 'bg-mint text-white'
-                            : 'text-gray-700 dark:text-dark-text hover:bg-cream dark:hover:bg-dark-bg'
-                          }
-                        `}
-                        role="menuitem"
-                        aria-current={isActive ? 'page' : undefined}
-                        aria-label={item.ariaLabel}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        <span className="emoji" aria-hidden="true">{item.icon}</span>
-                        <span>{t(item.translationKey)}</span>
-                      </Link>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      handleLogout();
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-3 rounded-lg text-gray-700 dark:text-dark-text hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-                    role="menuitem"
-                    aria-label="התנתק מהחשבון"
-                  >
-                    <span className="emoji" aria-hidden="true">🚪</span>
-                    <span>{t('auth.logout')}</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link
-                    to={ROUTES.LOGIN}
-                    className="flex items-center gap-2 px-4 py-3 rounded-lg text-gray-700 dark:text-dark-text hover:bg-cream dark:hover:bg-dark-bg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
-                    role="menuitem"
-                    aria-label="התחבר לחשבון קיים"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <span className="emoji" aria-hidden="true">🔑</span>
-                    <span>{t('auth.login')}</span>
-                  </Link>
-                  <Link
-                    to={ROUTES.REGISTER}
-                    className="flex items-center gap-2 px-4 py-3 rounded-lg bg-sky text-white hover:bg-sky/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
-                    role="menuitem"
-                    aria-label="צור חשבון חדש"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <span className="emoji" aria-hidden="true">📝</span>
-                    <span>{t('auth.register')}</span>
-                  </Link>
-                </>
-              )}
-              
-              {/* Theme and language in mobile */}
-              <div className="flex items-center gap-4 px-4 py-3 border-t border-gray-200 dark:border-dark-border mt-2">
-                <ThemeToggle />
-                <LanguageSwitcher />
-              </div>
-            </div>
+            {text.calendar}
+          </NavLink>
+          <NavLink 
+            to={ROUTES.ROOMS} 
+            className="touch-target px-3 py-1 rounded transition-colors hover:bg-blue-50 dark:hover:bg-gray-700"
+          >
+            {text.rooms}
+          </NavLink>
+          <NavLink 
+            to={ROUTES.ALL_TASKS} 
+            className="touch-target px-3 py-1 rounded transition-colors hover:bg-blue-50 dark:hover:bg-gray-700"
+          >
+            {text.tasks}
+          </NavLink>
+          {isAuthenticated && (
+            <>
+              <button 
+                onClick={handleLogout} 
+                className="touch-target px-3 py-1 rounded border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                {text.logout}
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Desktop Auth Buttons - רק אם לא מחובר */}
+        {!isAuthenticated && (
+          <div className="hidden md:flex items-center space-x-3 space-x-reverse">
+            <NavLink 
+              to={ROUTES.LOGIN} 
+              className="touch-target px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-sm"
+            >
+              {text.login}
+            </NavLink>
+            <NavLink 
+              to={ROUTES.REGISTER} 
+              className="touch-target px-3 py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
+            >
+              {text.register}
+            </NavLink>
+          </div>
+        )}
+
+        {/* Mobile Menu Button */}
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="md:hidden touch-target p-2"
+          aria-label={text.menu}
+        >
+          {mobileMenuOpen ? "✕" : "☰"}
+        </button>
+      </div>
+
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden mt-4 pb-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+          <div className="flex flex-col space-y-3">
+            <NavLink 
+              to={ROUTES.CALENDAR} 
+              className="touch-target py-2 px-4 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition-colors"
+              onClick={closeMobileMenu}
+            >
+              {text.calendar}
+            </NavLink>
+            <NavLink 
+              to={ROUTES.ROOMS} 
+              className="touch-target py-2 px-4 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition-colors"
+              onClick={closeMobileMenu}
+            >
+              {text.rooms}
+            </NavLink>
+            <NavLink 
+              to={ROUTES.ALL_TASKS} 
+              className="touch-target py-2 px-4 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition-colors"
+              onClick={closeMobileMenu}
+            >
+              {text.tasks}
+            </NavLink>
+            {isAuthenticated && (
+              <>
+                <button 
+                  onClick={handleLogout} 
+                  className="touch-target text-right py-2 px-4 rounded border border-gray-300 dark:border-gray-600"
+                >
+                  {text.logout}
+                </button>
+              </>
+            )}
+            {!isAuthenticated && (
+              <>
+                <NavLink 
+                  to={ROUTES.LOGIN} 
+                  className="touch-target text-right py-2 px-4 rounded border border-gray-300 dark:border-gray-600"
+                  onClick={closeMobileMenu}
+                >
+                  {text.login}
+                </NavLink>
+                <NavLink 
+                  to={ROUTES.REGISTER} 
+                  className="touch-target text-right py-2 px-4 rounded bg-blue-600 text-white"
+                  onClick={closeMobileMenu}
+                >
+                  {text.register}
+                </NavLink>
+              </>
+            )}
           </div>
         </div>
-      </nav>
-      
-      {/* Skip link target */}
-      <div id="main-content" tabIndex={-1} className="outline-none" />
-    </header>
+      )}
+    </nav>
   );
 };
-
-export { NavBar };
-export default NavBar;

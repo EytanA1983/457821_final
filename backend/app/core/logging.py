@@ -12,6 +12,7 @@ import json
 import uuid
 import logging
 import threading
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 from datetime import datetime
@@ -66,8 +67,25 @@ def correlation_id_filter(record):
         record["extra"]["correlation_id"] = correlation_id_var.get() or str(uuid.uuid4())[:8]
         request_ctx = request_context_var.get()
         # Only add if it's a simple dict (not circular)
-        if isinstance(request_ctx, dict) and len(str(request_ctx)) < 1000:
-            record["extra"]["request_context"] = request_ctx
+        if isinstance(request_ctx, dict):
+            try:
+                # Check dict size without converting to string (to avoid recursion)
+                if len(request_ctx) < 20:
+                    # Try to serialize safely
+                    simple_ctx = {}
+                    for k, v in list(request_ctx.items())[:10]:
+                        if isinstance(v, (str, int, float, bool, type(None))):
+                            simple_ctx[str(k)[:50]] = v
+                        else:
+                            try:
+                                simple_ctx[str(k)[:50]] = str(v)[:200]
+                            except (RecursionError, ValueError):
+                                simple_ctx[str(k)[:50]] = f"<{type(v).__name__}>"
+                    record["extra"]["request_context"] = simple_ctx
+                else:
+                    record["extra"]["request_context"] = {"size": len(request_ctx), "note": "dict too large"}
+            except Exception:
+                record["extra"]["request_context"] = {}
         else:
             record["extra"]["request_context"] = {}
     finally:
@@ -117,12 +135,30 @@ def json_serializer(record) -> str:
                     # Only serialize simple types
                     if isinstance(value, (str, int, float, bool, type(None))):
                         log_record[str(key)[:50]] = value
+                    elif isinstance(value, dict):
+                        # For dicts, try to serialize safely
+                        try:
+                            # Limit dict size to prevent recursion
+                            if len(value) < 20:
+                                log_record[str(key)[:50]] = {str(k)[:50]: str(v)[:200] for k, v in list(value.items())[:10]}
+                            else:
+                                log_record[str(key)[:50]] = "<dict too large>"
+                        except Exception:
+                            log_record[str(key)[:50]] = "<dict unserializable>"
                     else:
-                        str_value = str(value)
-                        if len(str_value) < 500:
-                            log_record[str(key)[:50]] = str_value
-                        else:
-                            log_record[str(key)[:50]] = str_value[:500] + "..."
+                        # For other types, try to convert to string with recursion protection
+                        try:
+                            # Use repr() instead of str() for better safety
+                            str_value = repr(value)
+                            if len(str_value) < 500:
+                                log_record[str(key)[:50]] = str_value
+                            else:
+                                log_record[str(key)[:50]] = str_value[:500] + "..."
+                        except (RecursionError, ValueError) as e:
+                            # Max recursion or other string conversion error
+                            log_record[str(key)[:50]] = f"<{type(value).__name__} - {type(e).__name__}>"
+                        except Exception:
+                            log_record[str(key)[:50]] = f"<{type(value).__name__} - unserializable>"
                 except Exception:
                     log_record[str(key)[:50]] = "<unserializable>"
         
@@ -249,119 +285,70 @@ def setup_elk_handler():
 
 
 def setup_logging():
-    """Configure loguru logging with rotation, JSON format, and external integrations"""
-    # Remove default handler
+    """
+    Configure loguru logging - minimal configuration to prevent recursion errors.
+    
+    IMPORTANT: 
+    1. Always call logger.remove() FIRST to clear all existing handlers
+    2. Use simple format string (no nested braces or color tags)
+    3. Disable colorize to prevent Colorizer recursion
+    4. Only ONE logger.add() call to avoid conflicts
+    
+    The format string must NOT contain:
+    - Nested braces like {{time:YYYY-MM-DD}} 
+    - Color tags like {red}...{reset}
+    - Complex formatting that could cause infinite recursion
+    """
+    from loguru import logger
+    import sys
+
+    # 1) Clean all existing handlers first
     logger.remove()
 
-    # Create logs directory if it doesn't exist
-    log_dir = Path(settings.LOG_DIR)
-    log_dir.mkdir(exist_ok=True)
+    configured_level = (settings.LOG_LEVEL or "INFO").upper().strip()
+    if configured_level not in {"TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"}:
+        configured_level = "INFO"
 
-    # Determine log format
-    if settings.LOG_FORMAT.lower() == "json":
-        # JSON format for ELK/Loki - custom serializer
-        log_format = "{extra[serialized]}"
-        
-        def json_formatter(record):
-            """Format record as JSON string"""
-            try:
-                record["extra"]["serialized"] = json_serializer(record)
-            except Exception:
-                # Fallback if serialization fails
-                record["extra"]["serialized"] = json.dumps({
-                    "message": str(record.get("message", "Logging error"))[:500],
-                    "error": "Serialization failed"
-                }, ensure_ascii=False)
-            return "{extra[serialized]}\n"
-    else:
-        # Human-readable format for console
-        log_format = (
-            "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-            "<level>{level: <8}</level> | "
-            "<cyan>[{extra[correlation_id]}]</cyan> | "
-            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-            "<level>{message}</level>"
-        )
-        json_formatter = None
+    # DEBUG logs are opt-in only (explicit env flag), even in development.
+    debug_logs_enabled = os.getenv("ENABLE_DEBUG_LOGS", "").lower() in {"1", "true", "yes", "on"}
+    effective_level = configured_level
+    if configured_level == "DEBUG" and not debug_logs_enabled:
+        effective_level = "INFO"
 
-    # Console handler (always enabled)
+    # 2) Add one safe stdout handler (simple format to prevent recursion issues).
     logger.add(
         sys.stdout,
-        format=json_formatter if json_formatter else log_format,
-        level=settings.LOG_LEVEL,
-        colorize=settings.LOG_FORMAT.lower() != "json",
-        backtrace=False,  # Disable to prevent recursion
-        diagnose=False,  # Disable to prevent recursion
-        filter=correlation_id_filter,
+        level=effective_level,
+        format=settings.LOG_FORMAT or "{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",
+        colorize=False,
     )
-
-    # File handler - All logs
-    logger.add(
-        log_dir / "app_{time:YYYY-MM-DD}.log",
-        format=json_formatter if json_formatter else log_format,
-        level=settings.LOG_LEVEL,
-        rotation=settings.LOG_ROTATION,
-        retention=settings.LOG_RETENTION,
-        compression=settings.LOG_COMPRESSION if settings.LOG_COMPRESSION else None,
-        backtrace=False,  # Disable backtrace to prevent recursion
-        diagnose=False,  # Disable diagnose to prevent recursion
-        encoding="utf-8",
-        filter=correlation_id_filter,
-    )
-
-    # File handler - Errors only
-    logger.add(
-        log_dir / "errors_{time:YYYY-MM-DD}.log",
-        format=json_formatter if json_formatter else log_format,
-        level="ERROR",
-        rotation=settings.LOG_ROTATION,
-        retention=settings.LOG_RETENTION,
-        compression=settings.LOG_COMPRESSION if settings.LOG_COMPRESSION else None,
-        backtrace=False,  # Disable backtrace to prevent recursion
-        diagnose=False,  # Disable diagnose to prevent recursion
-        encoding="utf-8",
-        filter=correlation_id_filter,
-    )
-
-    # File handler - JSON format for ELK/Loki (removed - using json_formatter above)
-    # This was causing issues, so we use json_formatter instead
-
-    # Setup CloudWatch handler (if configured)
-    cloudwatch_handler = setup_cloudwatch_handler()
-    if cloudwatch_handler:
-        # Add CloudWatch via standard logging bridge
-        logging.getLogger("cloudwatch").addHandler(cloudwatch_handler)
-
-    # Setup ELK handler (if configured)
-    elk_sink = setup_elk_handler()
-    if elk_sink:
-        logger.add(
-            elk_sink,
-            level=settings.LOG_LEVEL,
-            filter=correlation_id_filter,
-        )
-
-    # Intercept standard logging
-    logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
-
-    # Configure third-party loggers
-    for logger_name in ["uvicorn", "uvicorn.access", "uvicorn.error", "fastapi", "sqlalchemy", "celery", "httpx"]:
-        logging_logger = logging.getLogger(logger_name)
-        logging_logger.handlers = [InterceptHandler()]
-        logging_logger.propagate = False
+    
+    # 3) Setup standard logging to intercept to loguru
+    # This allows using logging.getLogger("app") with extra context
+    standard_logger = logging.getLogger("app")
+    standard_logger.setLevel(getattr(logging, effective_level, logging.INFO))
+    standard_logger.handlers = []  # Clear existing handlers
+    standard_logger.addHandler(InterceptHandler())
+    standard_logger.propagate = False  # Prevent duplicate logs
 
     logger.info(
         "Logging configured",
         extra={
-            "log_level": settings.LOG_LEVEL,
-            "log_format": settings.LOG_FORMAT,
-            "log_dir": str(log_dir),
-            "rotation": settings.LOG_ROTATION,
-            "retention": settings.LOG_RETENTION,
-            "cloudwatch_enabled": cloudwatch_handler is not None,
-            "elk_enabled": elk_sink is not None,
+            "configured_level": configured_level,
+            "effective_level": effective_level,
+            "debug_logs_enabled": debug_logs_enabled,
+            "format_type": settings.LOG_FORMAT_TYPE,
         },
     )
+
+    # Optional: Add file logging (uncomment if needed)
+    # logger.add(
+    #     "app.log",
+    #     level="INFO",
+    #     format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",
+    #     rotation="10 MB",
+    #     colorize=False,
+    # )
 
 
 # ================== Context Management ==================

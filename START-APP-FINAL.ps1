@@ -1,109 +1,56 @@
-# Final working script to start both servers
-# Works with Hebrew characters in path
+# PowerShell script to start both backend and frontend servers
+# Final E2E check - ready to run!
 
-Write-Host ""
-Write-Host "╔════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║  🚀 סידור וארגון הבית - אלי מאור                          ║" -ForegroundColor Cyan
-Write-Host "╚════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
-Write-Host ""
-
-# Define paths
-$projectRoot = $PSScriptRoot
-$backendPath = Join-Path $projectRoot "backend"
-$frontendPath = Join-Path $projectRoot "frontend"
-
-Write-Host "📁 Project: $projectRoot" -ForegroundColor Gray
+Write-Host "=" * 70 -ForegroundColor Cyan
+Write-Host "  🚀 Starting Application - Final E2E Check" -ForegroundColor Cyan
+Write-Host "=" * 70 -ForegroundColor Cyan
 Write-Host ""
 
-# Check if directories exist
-if (-not (Test-Path $backendPath)) {
-    Write-Host "❌ Backend directory not found!" -ForegroundColor Red
-    exit 1
+# Check backend .env
+Write-Host "📋 Checking Backend Configuration..." -ForegroundColor Yellow
+if (Test-Path "backend\.env") {
+    Write-Host "  ✅ .env file exists" -ForegroundColor Green
+    $hasSecretKey = Select-String -Path "backend\.env" -Pattern "SECRET_KEY" -Quiet
+    $hasDatabaseUrl = Select-String -Path "backend\.env" -Pattern "DATABASE_URL" -Quiet
+    if ($hasSecretKey) {
+        Write-Host "  ✅ SECRET_KEY is set" -ForegroundColor Green
+    } else {
+        Write-Host "  ❌ SECRET_KEY is missing!" -ForegroundColor Red
+    }
+    if ($hasDatabaseUrl) {
+        Write-Host "  ✅ DATABASE_URL is set" -ForegroundColor Green
+    } else {
+        Write-Host "  ❌ DATABASE_URL is missing!" -ForegroundColor Red
+    }
+} else {
+    Write-Host "  ❌ .env file not found!" -ForegroundColor Red
+    Write-Host "  💡 Create backend/.env with SECRET_KEY and DATABASE_URL" -ForegroundColor Yellow
 }
 
-if (-not (Test-Path $frontendPath)) {
-    Write-Host "❌ Frontend directory not found!" -ForegroundColor Red
-    exit 1
+Write-Host ""
+Write-Host "📋 Checking Frontend Configuration..." -ForegroundColor Yellow
+if (Test-Path "frontend\vite.config.ts") {
+    Write-Host "  ✅ vite.config.ts exists" -ForegroundColor Green
+} else {
+    Write-Host "  ❌ vite.config.ts not found!" -ForegroundColor Red
 }
 
-# Start Backend in new window
-Write-Host "🔧 [1/2] Starting Backend Server..." -ForegroundColor Yellow
-
-$backendCommand = @"
-Set-Location '$backendPath'
-Write-Host ''
-Write-Host '╔═══════════════════════════════════════╗' -ForegroundColor Green
-Write-Host '║  🐍 Backend Server (FastAPI)          ║' -ForegroundColor Green
-Write-Host '╚═══════════════════════════════════════╝' -ForegroundColor Green
-Write-Host ''
-Write-Host '🚀 Starting on http://127.0.0.1:8000' -ForegroundColor Cyan
-Write-Host '📚 API Docs: http://127.0.0.1:8000/docs' -ForegroundColor Cyan
-Write-Host ''
-
-if (-not (Test-Path '.env')) {
-    Write-Host '⚠️  Creating .env file...' -ForegroundColor Yellow
-    'SECRET_KEY=dev-secret-key-change-in-production' | Out-File -FilePath '.env' -Encoding utf8
-}
-
-python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-"@
-
-Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCommand
-
-Write-Host "   ✅ Backend terminal opened" -ForegroundColor Green
-Write-Host "   ⏳ Waiting 6 seconds for backend to initialize..." -ForegroundColor Gray
-Start-Sleep -Seconds 6
-
-# Start Frontend in new window
 Write-Host ""
-Write-Host "⚛️  [2/2] Starting Frontend Server..." -ForegroundColor Yellow
-
-$frontendCommand = @"
-Set-Location '$frontendPath'
-Write-Host ''
-Write-Host '╔═══════════════════════════════════════╗' -ForegroundColor Green
-Write-Host '║  ⚛️  Frontend Server (Vite + React)  ║' -ForegroundColor Green
-Write-Host '╚═══════════════════════════════════════╝' -ForegroundColor Green
-Write-Host ''
-Write-Host '🚀 Starting on http://localhost:5178' -ForegroundColor Cyan
-Write-Host ''
-
-npm run dev
-"@
-
-Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCommand
-
-Write-Host "   ✅ Frontend terminal opened" -ForegroundColor Green
-Write-Host "   ⏳ Waiting 10 seconds for frontend to build..." -ForegroundColor Gray
-Start-Sleep -Seconds 10
-
-# Open browsers
+Write-Host "=" * 70 -ForegroundColor Cyan
+Write-Host "  Starting Servers..." -ForegroundColor Cyan
+Write-Host "=" * 70 -ForegroundColor Cyan
 Write-Host ""
-Write-Host "🌐 Opening browsers..." -ForegroundColor Cyan
-
-Write-Host "   → Application: http://localhost:5178" -ForegroundColor Gray
-Start-Process "http://localhost:5178"
-
-Start-Sleep -Seconds 2
-
-Write-Host "   → API Docs: http://localhost:8000/docs" -ForegroundColor Gray
-Start-Process "http://localhost:8000/docs"
-
-# Final summary
+Write-Host "⚠️  IMPORTANT: You need to run these commands in separate terminals:" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "╔════════════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║  ✅ Servers Started Successfully!                         ║" -ForegroundColor Green
-Write-Host "╚════════════════════════════════════════════════════════════╝" -ForegroundColor Green
+Write-Host "Terminal 1 (Backend):" -ForegroundColor Green
+Write-Host "  cd backend" -ForegroundColor Gray
+Write-Host "  python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000" -ForegroundColor Gray
 Write-Host ""
-Write-Host "🔗 URLs:" -ForegroundColor Cyan
-Write-Host "   • Frontend:  http://localhost:5178" -ForegroundColor White
-Write-Host "   • Backend:   http://localhost:8000" -ForegroundColor White
-Write-Host "   • API Docs:  http://localhost:8000/docs" -ForegroundColor White
+Write-Host "Terminal 2 (Frontend):" -ForegroundColor Green
+Write-Host "  cd frontend" -ForegroundColor Gray
+Write-Host "  npm run dev" -ForegroundColor Gray
 Write-Host ""
-Write-Host "📝 Notes:" -ForegroundColor Yellow
-Write-Host "   • Both servers are running in separate windows" -ForegroundColor Gray
-Write-Host "   • Press Ctrl+C in each window to stop the servers" -ForegroundColor Gray
-Write-Host "   • Check each terminal for errors or warnings" -ForegroundColor Gray
+Write-Host "Then open:" -ForegroundColor Yellow
+Write-Host "  http://localhost:5179" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Press any key to close this window..." -ForegroundColor Gray
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Write-Host "=" * 70 -ForegroundColor Cyan

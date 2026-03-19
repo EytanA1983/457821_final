@@ -1,56 +1,43 @@
-from celery import Celery
-from app.config import settings
+from __future__ import annotations
 
+import os
+from celery import Celery
+
+# ----------------------------------------------------------------------
+# הגדרת Celery (Broker = Redis, Backend = Redis)
+# ----------------------------------------------------------------------
+BROKER_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 celery = Celery(
-    "worker",
-    broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL,
+    "eli_maor",
+    broker=BROKER_URL,
+    backend=BROKER_URL,
     include=[
-        "app.workers.tasks",
-        "app.workers.recurring_tasks",
-        "app.workers.email_tasks",
-        "app.celery_tasks.maintenance",
+        # רשימת משימות **שאנו באמת משתמשים**:
+        "app.workers.tasks",                    # push-notifications
+        "app.workers.shopping_reminder_tasks",  # תזכורת לקניות
+        "app.workers.email_tasks",              # שליחת אימיילים
+        "app.workers.recurring_tasks",          # משימות חוזרות
+        "app.celery_tasks.google_calendar",     # סנכרון עם Google Calendar
+        # אפשר להוסיף כאן משימות חדשות בעתיד
     ],
 )
 
 celery.conf.update(
-    timezone="Asia/Jerusalem",
-    enable_utc=False,
     task_serializer="json",
     result_serializer="json",
     accept_content=["json"],
-    beat_schedule={
-        "daily-notifications": {
-            "task": "app.workers.tasks.send_daily_notifications",
-            "schedule": 60 * 60 * 24,  # once a day
-        },
-        "weekly-notifications": {
-            "task": "app.workers.tasks.send_weekly_notifications",
-            "schedule": 60 * 60 * 24 * 7,  # once a week
-        },
-        "generate-recurring-instances": {
-            "task": "app.workers.recurring_tasks.generate_recurring_instances",
-            "schedule": 60 * 60 * 24,  # once a day - generate future instances
-        },
-        "cleanup-old-instances": {
-            "task": "app.workers.recurring_tasks.cleanup_old_instances",
-            "schedule": 60 * 60 * 24 * 7,  # once a week - cleanup old instances
-        },
-        "send-daily-task-reminders": {
-            "task": "app.workers.email_tasks.send_daily_task_reminders",
-            "schedule": 60 * 60 * 24,  # once a day - send reminders for yesterday's tasks
-        },
-        "send-daily-summaries": {
-            "task": "app.workers.email_tasks.send_daily_summaries",
-            "schedule": 60 * 60 * 24,  # once a day - send daily summaries
-        },
-        "cleanup-expired-tokens": {
-            "task": "app.celery_tasks.maintenance.cleanup_expired_tokens",
-            "schedule": 60 * 60 * 24,  # once a day - cleanup expired tokens from blocklist
-        },
-        "cleanup-old-notifications": {
-            "task": "app.celery_tasks.maintenance.cleanup_old_notifications",
-            "schedule": 60 * 60 * 24 * 7,  # once a week - cleanup old notifications
-        },
-    },
+    timezone="UTC",
+    enable_utc=True,
 )
+
+# ----------------------------------------------------------------------
+# Beat Schedule - משימות מתוזמנות
+# ----------------------------------------------------------------------
+celery.conf.beat_schedule = {
+    # דוגמה: שליחת תזכורת קניות כל שעה
+    "send-shopping-reminders": {
+        "task": "app.workers.shopping_reminder_tasks.send_shopping_reminders",
+        "schedule": 60 * 60,      # כל שעה
+    },
+    # הוסיפו משימות נוספות לפי צורך
+}

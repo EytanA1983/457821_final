@@ -23,6 +23,12 @@ class TaskBase(BaseModel):
     rrule_end_date: Optional[datetime] = Field(None, description="RRULE end date (optional)")
     category_id: Optional[int] = Field(None, description="Category ID")
     room_id: Optional[int] = Field(None, description="Room ID")
+    assignee_user_id: Optional[int] = Field(None, description="Assigned user id for family mode")
+    assignee_name: Optional[str] = Field(None, max_length=120, description="Assignee display name")
+    assignee_age: Optional[int] = Field(None, ge=1, le=120, description="Assignee age")
+    is_kid_task: bool = Field(False, description="Whether this task is for a child")
+    before_image_url: Optional[str] = Field(None, description="Before image URL")
+    after_image_url: Optional[str] = Field(None, description="After image URL")
 
 
 class TaskCreate(TaskBase):
@@ -39,7 +45,13 @@ class TaskUpdate(BaseModel):
     completed: Optional[bool] = None
     category_id: Optional[int] = None
     room_id: Optional[int] = None
+    assignee_user_id: Optional[int] = None
+    assignee_name: Optional[str] = Field(None, max_length=120)
+    assignee_age: Optional[int] = Field(None, ge=1, le=120)
+    is_kid_task: Optional[bool] = None
     position: Optional[int] = Field(None, description="Display order for drag & drop")
+    before_image_url: Optional[str] = None
+    after_image_url: Optional[str] = None
 
 
 class TaskRead(TaskBase):
@@ -49,7 +61,10 @@ class TaskRead(TaskBase):
     completed: bool
     position: int = 0
     created_at: datetime
-    updated_at: datetime
+    updated_at: datetime  # Required - model has server_default=func.now() and nullable=False
+    completed_at: Optional[datetime] = None
+    before_image_at: Optional[datetime] = None
+    after_image_at: Optional[datetime] = None
     is_recurring_template: bool = False
     parent_task_id: Optional[int] = None
     # Related objects

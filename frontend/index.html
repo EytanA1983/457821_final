@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
   <title>אלי מאור – סידור וארגון הבית</title>
 
   <!-- PWA Meta Tags -->
@@ -17,8 +17,11 @@
   <meta name="msapplication-TileColor" content="#FAF3E0" />
   <meta name="msapplication-config" content="/browserconfig.xml" />
 
-  <!-- PWA Manifest - injected by vite-plugin-pwa -->
-  <link rel="manifest" href="/manifest.webmanifest" />
+  <!-- PWA Manifest -->
+  <!-- href points to root of application (/manifest.webmanifest) -->
+  <!-- crossorigin="use-credentials" is only needed if manifest is on different domain -->
+  <!-- Temporarily disabled to fix "Manifest: Line: 1, column: 1, Syntax error" -->
+  <!-- <link rel="manifest" href="/manifest.webmanifest" /> -->
 
   <!-- Favicon & Apple Touch Icons -->
   <link rel="icon"
@@ -28,30 +31,10 @@
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
   <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#FAF3E0" />
 
-  <!-- DNS Prefetch for external resources -->
-  <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
-  <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
-
-  <!-- Preconnect to Google Fonts (with crossorigin for CORS) -->
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
-  <!-- Preload critical fonts (display: swap for FOUT instead of FOIT) -->
-  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap" as="style"
-    onload="this.onload=null;this.rel='stylesheet'" />
-  <noscript>
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  </noscript>
-
-  <!-- Load full font set after page load -->
-  <link
-    href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700&family=Rubik:wght@300;400;500;600;700&family=Heebo:wght@300;400;500;600;700&display=swap"
-    rel="stylesheet" media="print" onload="this.media='all'" />
-  <noscript>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700&family=Rubik:wght@300;400;500;600;700&family=Heebo:wght@300;400;500;600;700&display=swap"
-      rel="stylesheet" />
-  </noscript>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@400;500;600&display=swap" rel="stylesheet">
 
   <!--
       Inline script to prevent theme flash (FOUC)

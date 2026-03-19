@@ -16,6 +16,15 @@ class RoomShareCreate(BaseModel):
     )
 
 
+class RoomShareByEmailCreate(BaseModel):
+    """Schema for sharing a room by target user email"""
+    email: str = Field(..., description="Email of user to share with")
+    permission: Permission = Field(
+        default=Permission.VIEWER,
+        description="Permission level (owner, editor, viewer)",
+    )
+
+
 class RoomShareResponse(BaseModel):
     """Schema for room share response"""
     id: int

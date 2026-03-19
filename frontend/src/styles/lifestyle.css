@@ -1,0 +1,112 @@
+:root{
+  --bg:#FAF9F7;
+  --card:#FFFFFF;
+  --text:#1C1C1C;
+  --muted:#6B6B6B;
+  --accent:#A07CFE;
+  --accentSoft:#F1ECFF;
+  --border:#EAEAEA;
+
+  --radiusLg:24px;
+  --radiusMd:14px;
+
+  --shadowSm:0 6px 18px rgba(0,0,0,.05);
+  --shadowMd:0 16px 50px rgba(0,0,0,.08);
+
+  --container:1100px;
+}
+
+body{
+  background:var(--bg);
+  color:var(--text);
+}
+
+/* Layout helpers */
+.ls-container{
+  max-width:var(--container);
+  margin:0 auto;
+  padding:24px 18px;
+}
+
+.ls-card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--radiusLg);
+  box-shadow:var(--shadowSm);
+}
+
+.ls-cardPad{ padding:18px; }
+
+.ls-title{
+  font-family:"Playfair Display", Georgia, serif;
+  font-weight:500;
+  letter-spacing:.2px;
+}
+
+.ls-muted{ color:var(--muted); }
+
+/* Top lifestyle bar */
+.ls-topbar{
+  position:sticky;
+  top:0;
+  z-index:30;
+  background:rgba(250,249,247,.85);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+}
+
+.ls-topbarInner{
+  max-width:var(--container);
+  margin:0 auto;
+  padding:14px 18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.ls-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 12px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:#fff;
+  box-shadow:var(--shadowSm);
+  font-weight:600;
+}
+
+.ls-pillAccent{
+  background:var(--accentSoft);
+  border-color:rgba(160,124,254,.35);
+  color:#4A2BC7;
+}
+
+/* Tabs */
+.ls-tabs{
+  display:flex;
+  gap:10px;
+  overflow:auto;
+  padding-bottom:6px;
+}
+
+.ls-tab{
+  flex:0 0 auto;
+  padding:10px 14px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:#fff;
+  font-weight:600;
+  box-shadow:0 6px 18px rgba(0,0,0,.04);
+}
+
+.ls-grid{
+  display:grid;
+  grid-template-columns:1.3fr .7fr;
+  gap:14px;
+  align-items:start;
+}
+@media (max-width: 980px){
+  .ls-grid{ grid-template-columns:1fr; }
+}

@@ -16,10 +16,72 @@ from app.schemas.statistics import (
     DistributionItem,
     TaskDurationStatistics,
     OverallStatistics,
+    HomeSummaryStatistics,
 )
 from app.core.logging import logger, log_api_call
+from app.db.models import Task, InventoryItem
+from datetime import datetime, timedelta
+from sqlalchemy import func
 
 router = APIRouter(prefix="/statistics", tags=["statistics"])
+
+
+@router.get("/home-summary", response_model=HomeSummaryStatistics)
+def get_home_summary_statistics(
+    range: str = Query(default="week", pattern="^(week|month)$"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Lightweight summary cards for dashboard:
+    - completed tasks in period
+    - rooms with at least one completed task in period
+    - donated inventory items in period
+    """
+    now = datetime.utcnow()
+    period_start = now - timedelta(days=7 if range == "week" else 30)
+
+    completed_tasks = (
+        db.query(func.count(Task.id))
+        .filter(
+            Task.user_id == current_user.id,
+            Task.completed.is_(True),
+            Task.completed_at.isnot(None),
+            Task.completed_at >= period_start,
+        )
+        .scalar()
+        or 0
+    )
+
+    organized_rooms = (
+        db.query(func.count(func.distinct(Task.room_id)))
+        .filter(
+            Task.user_id == current_user.id,
+            Task.completed.is_(True),
+            Task.completed_at.isnot(None),
+            Task.completed_at >= period_start,
+            Task.room_id.isnot(None),
+        )
+        .scalar()
+        or 0
+    )
+
+    donated_items = (
+        db.query(func.count(InventoryItem.id))
+        .filter(
+            InventoryItem.user_id == current_user.id,
+            InventoryItem.is_donated.is_(True),
+            InventoryItem.updated_at >= period_start,
+        )
+        .scalar()
+        or 0
+    )
+
+    return HomeSummaryStatistics(
+        completed_tasks=int(completed_tasks),
+        organized_rooms=int(organized_rooms),
+        donated_items=int(donated_items),
+    )
 
 
 @router.get("/overall", response_model=OverallStatistics)

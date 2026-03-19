@@ -1,7 +1,7 @@
 """Add token_blocklist table
 
 Revision ID: 005
-Revises: 004
+Revises: 004_add_refresh_tokens
 Create Date: 2024-01-01 12:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '005'
-down_revision = '004'
+down_revision = '004_add_refresh_tokens'  # Fixed: must match revision ID from 004
 branch_labels = None
 depends_on = None
 

@@ -1,477 +1,418 @@
-# פריסה - Production
+# 🚀 Production Deployment Guide
 
-מדריך לפריסת המערכת ב-Production עם Docker Swarm / Kubernetes.
+מדריך מפורט לפריסת האפליקציה ל-production.
 
-## 🏗️ ארכיטקטורת Production
+## 📋 Prerequisites
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Ingress (HTTPS)                       │
-│              Let's Encrypt (cert-manager)                │
-└─────────────────────────────────────────────────────────┘
-                          │
-        ┌─────────────────┼─────────────────┐
-        │                 │                 │
-┌───────▼──────┐  ┌───────▼──────┐  ┌───────▼──────┐
-│   Frontend   │  │    Backend   │  │   WebSocket  │
-│   (CDN)      │  │   (FastAPI)  │  │   (WS)       │
-└──────────────┘  └───────┬───────┘  └──────────────┘
-                          │
-        ┌─────────────────┼─────────────────┐
-        │                 │                 │
-┌───────▼──────┐  ┌───────▼──────┐  ┌───────▼──────┐
-│  PostgreSQL  │  │    Redis     │  │ Celery Worker│
-│  (RDS/Managed)│  │ (Elasticache)│  │  + Beat      │
-└──────────────┘  └──────────────┘  └──────────────┘
-```
+### Required
+- Docker & Docker Compose installed
+- PostgreSQL 16+ (or use included Docker service)
+- Redis (or use included Docker service)
+- Domain name configured (optional, for production)
+- SSL/TLS certificates (optional, for HTTPS)
 
-## 🚀 אפשרויות פריסה
+### Optional but Recommended
+- Sentry account (for error tracking)
+- Monitoring dashboard (Prometheus/Grafana)
+- CI/CD pipeline (GitHub Actions, GitLab CI, etc.)
 
-### 1. Docker Swarm
+---
+
+## 🔧 Step 1: Environment Setup
+
+### Backend Environment Variables
+
+Create `backend/.env` file:
 
 ```bash
-# Initialize swarm
-docker swarm init
+# Core
+SECRET_KEY=your-strong-secret-key-min-32-chars
+DATABASE_URL=postgresql+psycopg2://postgres:password@db:5432/eli_maor
+REDIS_URL=redis://redis:6379/0
+DEBUG=False
+ENVIRONMENT=production
 
-# Deploy stack
-docker stack deploy -c docker-compose.prod.yml eli-maor
+# JWT
+ACCESS_TOKEN_EXPIRE_MINUTES=15
+REFRESH_TOKEN_EXPIRE_DAYS=30
 
-# Scale services
-docker service scale eli-maor_backend=3
-docker service scale eli-maor_worker=2
+# CORS (comma-separated)
+CORS_ORIGINS=https://your-domain.com,https://www.your-domain.com
+
+# Optional: Sentry
+SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
+SENTRY_ENVIRONMENT=production
+
+# Optional: Google OAuth
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+
+# Optional: Push Notifications
+VAPID_PUBLIC_KEY=your-vapid-public-key
+VAPID_PRIVATE_KEY=your-vapid-private-key
 ```
 
-### 2. Kubernetes
-
-ראה קבצים ב-`k8s/`:
-- `deployment.yaml` - Deployments לכל services
-- `service.yaml` - Services ו-Ingress
-- `configmap.yaml` - Configuration
-- `secrets.yaml` - Secrets (לא ב-git!)
-
-## 🌐 הקצאת דומיין והגדרת TLS
-
-### 1. הקצאת דומיין
-
-#### רכישת דומיין
-- רכוש דומיין מ-registrar (לדוגמה: Namecheap, GoDaddy, Cloudflare)
-- דוגמה: `eli-maor.com`
-
-#### הגדרת DNS Records
-
-**אם משתמשים ב-Cloudflare:**
-```
-Type    Name    Content              TTL
-A       @       YOUR_SERVER_IP        Auto
-A       www     YOUR_SERVER_IP        Auto
-A       api     YOUR_SERVER_IP        Auto
+**Generate SECRET_KEY:**
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-**אם משתמשים ב-DNS רגיל:**
-```
-A Record:     @ → YOUR_SERVER_IP
-A Record:     www → YOUR_SERVER_IP
-A Record:     api → YOUR_SERVER_IP (או CNAME ל-@)
-```
+### Frontend Environment Variables
 
-### 2. הגדרת TLS - Let's Encrypt עם Nginx
-
-#### התקנת Certbot
+Create `frontend/.env` file:
 
 ```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install certbot python3-certbot-nginx
-
-# CentOS/RHEL
-sudo yum install certbot python3-certbot-nginx
-```
-
-#### קבלת תעודות SSL
-
-```bash
-# תעודה לדומיין הראשי
-sudo certbot --nginx -d eli-maor.com -d www.eli-maor.com
-
-# תעודה ל-subdomain (API)
-sudo certbot --nginx -d api.eli-maor.com
-```
-
-#### עדכון Nginx Configuration
-
-```nginx
-# /etc/nginx/sites-available/eli-maor.com
-server {
-    listen 80;
-    server_name eli-maor.com www.eli-maor.com;
-    
-    # Redirect HTTP to HTTPS
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name eli-maor.com www.eli-maor.com;
-
-    # SSL certificates (Let's Encrypt)
-    ssl_certificate /etc/letsencrypt/live/eli-maor.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/eli-maor.com/privkey.pem;
-    
-    # SSL configuration
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384';
-    ssl_prefer_server_ciphers on;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 10m;
-
-    # Security headers
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-
-    # Frontend
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Backend API
-    location /api {
-        proxy_pass http://localhost:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # WebSocket
-    location /ws {
-        proxy_pass http://localhost:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-
-# API Subdomain
-server {
-    listen 443 ssl http2;
-    server_name api.eli-maor.com;
-
-    ssl_certificate /etc/letsencrypt/live/api.eli-maor.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/api.eli-maor.com/privkey.pem;
-
-    location / {
-        proxy_pass http://localhost:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-#### חידוש אוטומטי של תעודות
-
-```bash
-# בדיקת חידוש אוטומטי
-sudo certbot renew --dry-run
-
-# הוספת cron job לחידוש אוטומטי
-sudo crontab -e
-# הוסף:
-0 0,12 * * * certbot renew --quiet
-```
-
-### 3. הגדרת TLS - Cloudflare (אפשרות נוספת)
-
-#### הגדרת Cloudflare
-
-1. **הוספת דומיין ל-Cloudflare**
-   - היכנס ל-Cloudflare Dashboard
-   - הוסף את הדומיין שלך
-   - עדכן את ה-Name Servers ב-registrar
-
-2. **הגדרת SSL/TLS**
-   ```
-   SSL/TLS → Overview → Full (strict)
-   ```
-
-3. **הגדרת DNS Records**
-   ```
-   Type    Name    Content              Proxy Status
-   A       @       YOUR_SERVER_IP        Proxied
-   A       www     YOUR_SERVER_IP        Proxied
-   A       api     YOUR_SERVER_IP        Proxied
-   ```
-
-4. **הגדרת Origin Certificate (אופציונלי)**
-   ```bash
-   # הורד Origin Certificate מ-Cloudflare Dashboard
-   # SSL/TLS → Origin Server → Create Certificate
-   
-   # העתק ל-server
-   sudo mkdir -p /etc/ssl/cloudflare
-   sudo cp origin.pem /etc/ssl/cloudflare/
-   sudo cp private.key /etc/ssl/cloudflare/
-   ```
-
-#### Nginx עם Cloudflare
-
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name eli-maor.com www.eli-maor.com;
-
-    # Cloudflare Origin Certificate (או Let's Encrypt)
-    ssl_certificate /etc/ssl/cloudflare/origin.pem;
-    ssl_certificate_key /etc/ssl/cloudflare/private.key;
-
-    # Cloudflare Real IP
-    set_real_ip_from 173.245.48.0/20;
-    set_real_ip_from 103.21.244.0/22;
-    set_real_ip_from 103.22.200.0/22;
-    set_real_ip_from 103.31.4.0/22;
-    set_real_ip_from 141.101.64.0/18;
-    set_real_ip_from 108.162.192.0/18;
-    set_real_ip_from 190.93.240.0/20;
-    set_real_ip_from 188.114.96.0/20;
-    set_real_ip_from 197.234.240.0/22;
-    set_real_ip_from 198.41.128.0/17;
-    set_real_ip_from 162.158.0.0/15;
-    set_real_ip_from 104.16.0.0/13;
-    set_real_ip_from 104.24.0.0/14;
-    set_real_ip_from 172.64.0.0/13;
-    set_real_ip_from 131.0.72.0/22;
-    real_ip_header CF-Connecting-IP;
-
-    # ... שאר ההגדרות כמו קודם
-}
-```
-
-### 4. Kubernetes - cert-manager
-
-```yaml
-# cert-manager installation
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
-
-# Certificate Issuer
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt-prod
-spec:
-  acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
-    email: admin@eli-maor.com
-    privateKeySecretRef:
-      name: letsencrypt-prod
-    solvers:
-    - http01:
-        ingress:
-          class: nginx
-
-# Ingress עם TLS
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: eli-maor-ingress
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-spec:
-  tls:
-  - hosts:
-    - eli-maor.com
-    - www.eli-maor.com
-    secretName: eli-maor-tls
-  rules:
-  - host: eli-maor.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: frontend
-            port:
-              number: 80
-```
-
-## 🗄️ Database
-
-### AWS RDS / Managed PostgreSQL
-
-```yaml
-# RDS Configuration
-Engine: PostgreSQL 16
-Instance: db.t3.medium (min)
-Storage: 100GB (auto-scaling)
-Backup: Daily, 7 days retention
-Multi-AZ: Enabled (production)
-```
-
-### Connection String
-```
-DATABASE_URL=postgresql+psycopg2://user:password@rds-endpoint:5432/eli_maor
-```
-
-## 🔴 Redis
-
-### AWS ElastiCache
-
-```yaml
-# ElastiCache Configuration
-Engine: Redis 7
-Node Type: cache.t3.micro (dev) / cache.t3.medium (prod)
-Cluster Mode: Disabled (single node)
-Backup: Daily snapshots
-```
-
-### Connection String
-```
-REDIS_URL=redis://elasticache-endpoint:6379/0
-```
-
-## ⚙️ Celery Beat - High Availability
-
-### Multiple Instances
-
-```yaml
-# Kubernetes Deployment
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: celery-beat
-spec:
-  replicas: 2  # Multiple instances for HA
-  template:
-    spec:
-      containers:
-      - name: beat
-        command: ["celery", "-A", "app.workers.celery_app.celery", "beat", "--loglevel=info"]
-```
-
-**הערה**: Celery Beat עם מספר מופעים דורש Redis lock mechanism.
-
-## 📦 Frontend - CDN
-
-### Vercel / Netlify
-
-```bash
-# Build frontend
-cd frontend
-npm run build
-
-# Deploy to Vercel
-vercel --prod
-
-# Or Netlify
-netlify deploy --prod
-```
-
-### Environment Variables
-```
-VITE_API_URL=https://api.yourdomain.com
+VITE_API_URL=https://api.your-domain.com/api
+VITE_WS_URL=wss://api.your-domain.com/ws
 VITE_VAPID_PUBLIC_KEY=your-vapid-public-key
 ```
 
-## 🔄 CI/CD - GitHub Actions
+---
 
-ראה `.github/workflows/deploy.yml` לפרטים מלאים.
+## 🐳 Step 2: Docker Build
 
-### Pipeline:
-1. **Lint** - black, isort, flake8
-2. **Test** - pytest עם coverage
-3. **Build** - Docker images
-4. **Push** - ל-ECR/Docker Hub
-5. **Deploy** - ל-Kubernetes/Swarm
+### Build Images
 
-## 📊 Monitoring
+```bash
+# Backend
+cd backend
+docker build -t eli-maor-backend:latest .
 
-### Health Checks
-
-```yaml
-# Kubernetes Liveness Probe
-livenessProbe:
-  httpGet:
-    path: /health
-    port: 8000
-  initialDelaySeconds: 30
-  periodSeconds: 10
-
-# Readiness Probe
-readinessProbe:
-  httpGet:
-    path: /health
-    port: 8000
-  initialDelaySeconds: 5
-  periodSeconds: 5
+# Frontend
+cd ../frontend
+docker build -t eli-maor-frontend:latest .
 ```
 
-### Logging
+Or use Docker Compose:
 
-- **Backend**: stdout/stderr → CloudWatch / ELK
-- **Celery**: File logs → S3 / CloudWatch
-- **Frontend**: Error tracking → Sentry
-
-## 🔐 Security
-
-1. **Secrets Management**: Kubernetes Secrets / AWS Secrets Manager
-2. **Network**: VPC isolation, Security Groups
-3. **WAF**: CloudFront / AWS WAF
-4. **Rate Limiting**: Nginx / API Gateway
-5. **CORS**: מוגבל ל-domains מורשים בלבד
-
-## 📈 Scaling
-
-### Auto-scaling
-
-```yaml
-# Kubernetes HPA
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: backend-hpa
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: backend
-  minReplicas: 2
-  maxReplicas: 10
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
+```bash
+docker-compose -f docker-compose.prod.standalone.yml build
 ```
 
-## 🚨 Disaster Recovery
+---
 
-1. **Database Backups**: Daily automated backups
-2. **Redis Persistence**: AOF enabled
-3. **Application State**: Stateless design
-4. **Multi-Region**: אפשרי עם Route53 failover
+## 🗄️ Step 3: Database Setup
 
-## 📝 Checklist לפני פריסה
+### Option A: Using Docker Compose (Recommended)
 
-- [ ] Environment variables מוגדרים
-- [ ] Secrets מוגדרים ב-Kubernetes/AWS
-- [ ] Database migrations רצו
-- [ ] SSL certificates מוגדרים
-- [ ] Health checks עובדים
-- [ ] Monitoring מוגדר
-- [ ] Logging מוגדר
-- [ ] Backup strategy מוגדרת
-- [ ] Scaling policies מוגדרות
-- [ ] Security groups מוגדרים
+The `docker-compose.prod.standalone.yml` includes PostgreSQL automatically.
+
+```bash
+docker-compose -f docker-compose.prod.standalone.yml up -d db
+```
+
+Wait for database to be ready:
+```bash
+docker-compose -f docker-compose.prod.standalone.yml logs db | grep "database system is ready"
+```
+
+### Option B: External PostgreSQL
+
+If using external PostgreSQL, update `DATABASE_URL` in `.env`:
+
+```bash
+DATABASE_URL=postgresql+psycopg2://user:password@host:5432/dbname
+```
+
+### Run Migrations
+
+```bash
+# Using Docker Compose (automatic)
+docker-compose -f docker-compose.prod.standalone.yml up backend
+
+# Or manually
+docker exec -it eli_maor_backend alembic upgrade head
+```
+
+---
+
+## 🚀 Step 4: Start Services
+
+### Using Docker Compose (Recommended)
+
+```bash
+docker-compose -f docker-compose.prod.standalone.yml up -d
+```
+
+This starts:
+- ✅ PostgreSQL database
+- ✅ Redis cache
+- ✅ Backend API (with auto-migrations)
+- ✅ Celery worker
+- ✅ Celery beat
+- ✅ Frontend (nginx)
+
+### Verify Services
+
+```bash
+# Check all services are running
+docker-compose -f docker-compose.prod.standalone.yml ps
+
+# Check backend health
+curl http://localhost:8000/health
+
+# Check frontend
+curl http://localhost:80/health
+```
+
+---
+
+## 🔍 Step 5: Health Checks
+
+### Backend Health Endpoints
+
+- `GET /health` - Basic health check
+- `GET /api/health/detailed` - Detailed health (database, Redis, etc.)
+
+### Frontend Health
+
+- `GET /health` - Returns "healthy" if nginx is running
+
+### Monitor Logs
+
+```bash
+# All services
+docker-compose -f docker-compose.prod.standalone.yml logs -f
+
+# Specific service
+docker-compose -f docker-compose.prod.standalone.yml logs -f backend
+docker-compose -f docker-compose.prod.standalone.yml logs -f frontend
+```
+
+---
+
+## 🔒 Step 6: Security Checklist
+
+### Before Going Live
+
+- [ ] `SECRET_KEY` is strong and unique (32+ characters)
+- [ ] `DEBUG=False` in production
+- [ ] `DATABASE_URL` uses PostgreSQL (not SQLite)
+- [ ] `CORS_ORIGINS` only includes your domain(s)
+- [ ] Database password is strong
+- [ ] All secrets are in `.env` (not committed to git)
+- [ ] SSL/TLS certificates configured (if using HTTPS)
+- [ ] Rate limiting enabled
+- [ ] Security headers enabled
+
+### Security Headers
+
+The backend automatically sets:
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: SAMEORIGIN`
+- `X-XSS-Protection: 1; mode=block`
+- `Strict-Transport-Security` (if HTTPS)
+- `Content-Security-Policy` (if configured)
+
+---
+
+## 📊 Step 7: Monitoring Setup
+
+### Sentry (Error Tracking)
+
+1. Create account at [sentry.io](https://sentry.io)
+2. Create new project (Python/FastAPI)
+3. Copy DSN to `backend/.env`:
+   ```bash
+   SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx
+   ```
+4. Restart backend:
+   ```bash
+   docker-compose -f docker-compose.prod.standalone.yml restart backend
+   ```
+
+### Prometheus Metrics
+
+Metrics are automatically exposed at:
+- `GET /metrics` - Prometheus format
+
+### Log Aggregation
+
+Logs are structured (JSON) and can be sent to:
+- ELK Stack (Elasticsearch, Logstash, Kibana)
+- CloudWatch (AWS)
+- Custom log aggregation service
+
+---
+
+## 🔄 Step 8: Updates & Maintenance
+
+### Update Application
+
+```bash
+# Pull latest code
+git pull
+
+# Rebuild images
+docker-compose -f docker-compose.prod.standalone.yml build
+
+# Restart services (zero-downtime with health checks)
+docker-compose -f docker-compose.prod.standalone.yml up -d
+```
+
+### Database Migrations
+
+Migrations run automatically on backend startup. To run manually:
+
+```bash
+docker exec -it eli_maor_backend alembic upgrade head
+```
+
+### Backup Database
+
+```bash
+# Using Docker
+docker exec eli_maor_db pg_dump -U postgres eli_maor > backup_$(date +%Y%m%d).sql
+
+# Restore
+docker exec -i eli_maor_db psql -U postgres eli_maor < backup_20240101.sql
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### Backend Won't Start
+
+1. Check logs:
+   ```bash
+   docker-compose -f docker-compose.prod.standalone.yml logs backend
+   ```
+
+2. Verify environment variables:
+   ```bash
+   docker exec eli_maor_backend env | grep -E "SECRET_KEY|DATABASE_URL"
+   ```
+
+3. Check database connection:
+   ```bash
+   docker exec eli_maor_backend python -c "from app.db.session import engine; print(engine.connect())"
+   ```
+
+### Frontend 502 Bad Gateway
+
+1. Check backend is running:
+   ```bash
+   curl http://localhost:8000/health
+   ```
+
+2. Check nginx logs:
+   ```bash
+   docker-compose -f docker-compose.prod.standalone.yml logs frontend
+   ```
+
+3. Verify nginx config:
+   ```bash
+   docker exec eli_maor_frontend nginx -t
+   ```
+
+### Database Connection Errors
+
+1. Verify PostgreSQL is running:
+   ```bash
+   docker-compose -f docker-compose.prod.standalone.yml ps db
+   ```
+
+2. Check connection string:
+   ```bash
+   echo $DATABASE_URL
+   ```
+
+3. Test connection:
+   ```bash
+   docker exec eli_maor_db pg_isready -U postgres
+   ```
+
+---
+
+## 📈 Performance Optimization
+
+### Backend
+
+- **Workers**: Adjust `--workers` in Dockerfile CMD (default: 2)
+- **Database Pool**: Configure in `app/db/session.py`
+- **Caching**: Redis is already configured
+- **Rate Limiting**: Adjust in `backend/.env`
+
+### Frontend
+
+- **Static Assets**: Already cached (1 year)
+- **Gzip**: Enabled in nginx
+- **Code Splitting**: Already configured in `vite.config.ts`
+
+### Database
+
+- **Connection Pooling**: Configured in SQLAlchemy
+- **Indexes**: Add indexes for frequently queried columns
+- **Vacuum**: Run `VACUUM ANALYZE` periodically
+
+---
+
+## 🔐 Production Best Practices
+
+### Secrets Management
+
+**DO:**
+- ✅ Use environment variables
+- ✅ Use Docker secrets (`/run/secrets/`)
+- ✅ Use AWS Secrets Manager / HashiCorp Vault
+- ✅ Rotate secrets regularly
+
+**DON'T:**
+- ❌ Commit secrets to git
+- ❌ Hardcode secrets in code
+- ❌ Share secrets in logs
+
+### Database
+
+- ✅ Use PostgreSQL in production (never SQLite)
+- ✅ Enable SSL connections
+- ✅ Regular backups (daily recommended)
+- ✅ Monitor database size and performance
+
+### Monitoring
+
+- ✅ Set up error tracking (Sentry)
+- ✅ Monitor API response times
+- ✅ Set up alerts for critical errors
+- ✅ Track user metrics (anonymized)
+
+---
+
+## 📞 Support & Resources
+
+### Documentation
+- [FastAPI Docs](https://fastapi.tiangolo.com/)
+- [React Query Docs](https://tanstack.com/query/latest)
+- [Docker Compose Docs](https://docs.docker.com/compose/)
+
+### Health Check URLs
+- Backend: `http://your-domain:8000/health`
+- Frontend: `http://your-domain/health`
+- Metrics: `http://your-domain:8000/metrics`
+
+---
+
+## ✅ Deployment Checklist
+
+Before going live, verify:
+
+- [ ] All environment variables set
+- [ ] Database migrations applied
+- [ ] Health checks passing
+- [ ] SSL/TLS configured (if using HTTPS)
+- [ ] CORS origins configured
+- [ ] Rate limiting enabled
+- [ ] Error tracking configured (Sentry)
+- [ ] Monitoring dashboards set up
+- [ ] Backups configured
+- [ ] Documentation updated
+
+---
+
+**🎉 Ready for Production!**
+
+For questions or issues, check logs first:
+```bash
+docker-compose -f docker-compose.prod.standalone.yml logs -f
+```

@@ -6,11 +6,23 @@ from datetime import datetime
 
 
 class Token(BaseModel):
-    """Response model for login/refresh endpoints"""
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-    expires_in: int  # Access token expiry in seconds
+    """
+    Response model for login/refresh/register endpoints
+    
+    IMPORTANT: All fields must match what the API returns.
+    If there's a mismatch (e.g., expires_in_mins instead of expires_in),
+    FastAPI will raise ValidationError.
+    
+    Fields:
+    - access_token: str (required) - JWT access token
+    - refresh_token: str (required) - JWT refresh token
+    - token_type: str (default: "bearer") - Token type (OAuth2 standard)
+    - expires_in: int (required) - Access token expiry in SECONDS (not minutes!)
+    """
+    access_token: str = Field(..., description="JWT access token")
+    refresh_token: str = Field(..., description="JWT refresh token")
+    token_type: str = Field(default="bearer", description="Token type (OAuth2 standard)")
+    expires_in: int = Field(..., description="Access token expiry in seconds (not minutes!)")
 
 
 class RefreshTokenRequest(BaseModel):
@@ -24,7 +36,19 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    """Schema for user registration"""
+    """
+    Schema for user registration
+    
+    Required fields:
+    - email: EmailStr (required, validated as email format)
+    - password: str (required, min 8 characters)
+    
+    Optional fields:
+    - full_name: Optional[str] (optional, max 100 characters)
+    
+    FastAPI will return 422 if email or password are missing.
+    If email is empty string, Pydantic validation will fail with 422.
+    """
     password: str = Field(..., min_length=8, description="User password (min 8 characters)")
     full_name: Optional[str] = Field(None, max_length=100, description="User's full name")
 
@@ -44,7 +68,8 @@ class UserRead(UserBase):
     full_name: Optional[str] = None
     is_active: bool = True
     is_superuser: bool = False
-    created_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 

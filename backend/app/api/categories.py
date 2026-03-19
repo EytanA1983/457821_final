@@ -12,7 +12,7 @@ from app.core.cache import invalidate_user_cache, cache_get, cache_set, make_cac
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
-@router.get("/", response_model=List[CategoryRead])
+@router.get("", response_model=List[CategoryRead])
 def read_categories(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """List categories with Redis caching (TTL: 1 minute)"""
     # Try cache first
@@ -45,7 +45,7 @@ def read_categories(db: Session = Depends(get_db), user: User = Depends(get_curr
 
     return categories
 
-@router.post("/", response_model=CategoryRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=CategoryRead, status_code=status.HTTP_201_CREATED)
 def create_category(
     request: Request,
     cat_in: CategoryCreate,

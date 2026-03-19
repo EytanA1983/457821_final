@@ -1,0 +1,15 @@
+# Nginx configuration example for manifest.webmanifest MIME type
+# Add this to your Nginx server block
+
+server {
+    listen 80;
+    server_name your-domain.com;
+    root /path/to/dist;
+
+    # Ensure manifest.webmanifest is served with correct MIME type
+    location ~* \.webmanifest$ {
+        add_header Content-Type application/manifest+json;
+    }
+
+    # Other configurations...
+}

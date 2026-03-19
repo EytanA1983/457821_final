@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from app.workers.celery_app import celery
 from app.db.session import SessionLocal
 from app.db.models import TokenBlocklist, RefreshToken
-from app.models.notification import Notification
+from app.db.models import Notification
 from app.core.logging import logger
 
 @celery.task(bind=True, name="app.celery_tasks.maintenance.cleanup_old_notifications")

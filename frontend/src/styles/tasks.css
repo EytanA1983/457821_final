@@ -1,0 +1,100 @@
+.taskList {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.taskCard {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 14px;
+  align-items: center;
+
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 16px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.05);
+  transition: .2s ease;
+}
+
+.taskCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 50px rgba(0,0,0,.08);
+  border-color: rgba(160,124,254,.3);
+}
+
+.taskCheck {
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.taskCheckDone {
+  background: var(--accentSoft);
+  border-color: rgba(160,124,254,.35);
+}
+
+.taskTitle {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.taskTitleDone {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.taskMeta {
+  margin-top: 6px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.chipAccent {
+  background: var(--accentSoft);
+  border-color: rgba(160,124,254,.35);
+  color: #4A2BC7;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 30px 20px;
+  color: var(--muted);
+}
+
+.emptyTitle {
+  font-family: "Playfair Display", serif;
+  font-size: 18px;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.taskCard{
+  position: relative;
+  overflow: hidden;
+}
+.taskCard::after{
+  content:"";
+  position:absolute;
+  inset:-2px;
+  background: radial-gradient(520px 220px at 0% 0%, rgba(160,124,254,.18), transparent 60%);
+  opacity:.5;
+  pointer-events:none;
+}

@@ -12,37 +12,94 @@ from app.services.audit import audit_service, AuditAction
 from app.workers.tasks import schedule_notification_for_task
 from app.services.notification import send_voice_feedback
 from app.services.recurring_tasks import recurring_tasks_service
-from app.core.logging import logger
+import logging
+
+logger = logging.getLogger("app")
 from app.core.cache import invalidate_user_cache, cache_get, cache_set, make_cache_key, CACHE_TTL_LONG
+from app.services.tasks import get_today_tasks
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
-@router.get("/", response_model=List[TaskRead])
+@router.get("", response_model=List[TaskRead])
 def list_tasks(
     completed: Optional[bool] = None,
     category_id: Optional[int] = None,
     room_id: Optional[int] = None,
+    scope: Optional[str] = None,  # "today" or "week"
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """List tasks with Redis caching (TTL: 2 minutes)"""
-    # Try cache first
-    cache_key = make_cache_key("tasks", user.id, completed=completed, category_id=category_id, room_id=room_id)
+    """
+    List tasks with Redis caching (TTL: 2 minutes)
+    
+    Task = משימות עם due_date / scope (today/week) / room_id
+    
+    Scope options:
+    - "today": Tasks due today (uncompleted only)
+    - "week": Tasks due within the next 7 days (uncompleted only)
+    - None: All tasks (respects completed filter)
+    
+    Filters:
+    - completed: Filter by completion status
+    - category_id: Filter by category
+    - room_id: Filter by room
+    - scope: Filter by time range (today/week)
+    """
+    from datetime import date, timedelta
+    from sqlalchemy import func
+    
+    logger.info("Fetching tasks", extra={"user": user.id, "completed": completed, "category_id": category_id, "room_id": room_id, "scope": scope})
+    
+    # Try cache first (include scope in cache key)
+    cache_key = make_cache_key("tasks", user.id, completed=completed, category_id=category_id, room_id=room_id, scope=scope)
     cached = cache_get(cache_key)
     if cached is not None:
+        # Backward-compatible cache hydration:
+        # older cache entries may miss required response fields (e.g. updated_at).
+        cache_was_updated = False
+        if isinstance(cached, list):
+            for item in cached:
+                if isinstance(item, dict) and "updated_at" not in item:
+                    item["updated_at"] = item.get("created_at")
+                    cache_was_updated = True
+        if cache_was_updated:
+            cache_set(cache_key, cached, CACHE_TTL_LONG)
         return cached  # Return cached list directly
 
     # Query database
     q = db.query(Task).filter(Task.user_id == user.id)
-    if completed is not None:
-        q = q.filter(Task.completed == completed)
-    if category_id:
-        q = q.filter(Task.category_id == category_id)
+    
+    # Apply scope filter (today or week)
+    if scope == "today":
+        today = date.today()
+        q = q.filter(
+            func.date(Task.due_date) == today,
+            Task.completed.is_(False)
+        )
+    elif scope == "week":
+        today = date.today()
+        week_end = today + timedelta(days=7)
+        q = q.filter(
+            func.date(Task.due_date) >= today,
+            func.date(Task.due_date) <= week_end,
+            Task.completed.is_(False)
+        )
+    
+    # Apply other filters (room_id and category_id work with any scope)
     if room_id:
         q = q.filter(Task.room_id == room_id)
+    if category_id:
+        q = q.filter(Task.category_id == category_id)
+    # completed filter only applies if scope is not set (scope already filters uncompleted)
+    if completed is not None and scope is None:
+        q = q.filter(Task.completed == completed)
 
-    # Order by position, then by created_at
-    q = q.order_by(Task.position.asc(), Task.created_at.asc())
+    # Order by due_date (if exists), then by position, then by created_at
+    q = q.order_by(
+        Task.due_date.asc().nullslast(),
+        Task.position.asc(),
+        Task.created_at.asc()
+    )
 
     tasks = q.all()
 
@@ -54,12 +111,28 @@ def list_tasks(
             "title": t.title,
             "description": t.description,
             "due_date": t.due_date.isoformat() if t.due_date else None,
+            "recurrence": t.recurrence.value if t.recurrence else "none",
+            "rrule_string": t.rrule_string,
+            "rrule_start_date": t.rrule_start_date.isoformat() if t.rrule_start_date else None,
+            "rrule_end_date": t.rrule_end_date.isoformat() if t.rrule_end_date else None,
             "completed": t.completed,
             "category_id": t.category_id,
+            "assignee_user_id": t.assignee_user_id,
+            "assignee_name": t.assignee_name,
+            "assignee_age": t.assignee_age,
+            "is_kid_task": t.is_kid_task,
             "room_id": t.room_id,
             "user_id": t.user_id,
             "position": t.position,
             "created_at": t.created_at.isoformat() if t.created_at else None,
+            "updated_at": t.updated_at.isoformat() if t.updated_at else (t.created_at.isoformat() if t.created_at else None),
+            "completed_at": t.completed_at.isoformat() if t.completed_at else None,
+            "before_image_url": t.before_image_url,
+            "after_image_url": t.after_image_url,
+            "before_image_at": t.before_image_at.isoformat() if t.before_image_at else None,
+            "after_image_at": t.after_image_at.isoformat() if t.after_image_at else None,
+            "is_recurring_template": t.is_recurring_template,
+            "parent_task_id": t.parent_task_id,
         }
         cache_data.append(task_dict)
 
@@ -67,7 +140,45 @@ def list_tasks(
 
     return tasks
 
-@router.post("/", response_model=TaskRead, status_code=status.HTTP_201_CREATED)
+@router.get("/today", response_model=List[TaskRead])
+def read_today_tasks(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Return **daily tasks** that are due today.
+    
+    Daily tasks are defined as:
+    - Tasks with due_date matching today (date part only), OR
+    - Tasks with recurrence = "daily", OR
+    - Tasks with rrule_string containing FREQ=DAILY
+    
+    Used by the HomePage pop‑up and daily tasks widget.
+    """
+    return get_today_tasks(db, user.id)
+
+@router.get("/weekly", response_model=List[TaskRead])
+def read_weekly_tasks(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Return **weekly tasks** (recurring weekly tasks).
+    
+    Weekly tasks are defined as:
+    - Tasks with recurrence = "weekly", OR
+    - Tasks with rrule_string containing FREQ=WEEKLY
+    
+    Note: This returns recurring weekly tasks, not "tasks due in next 7 days".
+    For tasks due in the next 7 days (regardless of recurrence),
+    use GET /api/tasks?scope=week
+    
+    Used by the HomePage weekly tasks widget.
+    """
+    from app.services.tasks import get_weekly_tasks
+    return get_weekly_tasks(db, user.id)
+
+@router.post("", response_model=TaskRead, status_code=status.HTTP_201_CREATED)
 def create_task(
     request: Request,
     task_in: TaskCreate,
@@ -176,7 +287,15 @@ def update_task(
     changed_fields = audit_service.get_changed_fields(task, db)
 
     # Update task
-    for key, value in task_in.dict(exclude_unset=True).items():
+    update_data = task_in.dict(exclude_unset=True)
+    if "completed" in update_data:
+        update_data["completed_at"] = datetime.utcnow() if update_data["completed"] else None
+    if "before_image_url" in update_data:
+        update_data["before_image_at"] = datetime.utcnow() if update_data["before_image_url"] else None
+    if "after_image_url" in update_data:
+        update_data["after_image_at"] = datetime.utcnow() if update_data["after_image_url"] else None
+
+    for key, value in update_data.items():
         setattr(task, key, value)
 
     db.flush()  # Flush to get updated values
@@ -253,6 +372,40 @@ def delete_task(
 
     return None
 
+@router.patch("/{task_id}", response_model=TaskRead)
+def patch_task(
+    request: Request,
+    task_id: int,
+    task_in: TaskUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    audit_context: dict = Depends(get_audit_context),
+):
+    """PATCH endpoint for partial task updates (optimistic updates)"""
+    task = db.query(Task).filter(Task.id == task_id, Task.user_id == user.id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="משימה לא קיימת")
+
+    # Update only provided fields
+    update_data = task_in.dict(exclude_unset=True)
+    if "completed" in update_data:
+        update_data["completed_at"] = datetime.utcnow() if update_data["completed"] else None
+    if "before_image_url" in update_data:
+        update_data["before_image_at"] = datetime.utcnow() if update_data["before_image_url"] else None
+    if "after_image_url" in update_data:
+        update_data["after_image_at"] = datetime.utcnow() if update_data["after_image_url"] else None
+
+    for key, value in update_data.items():
+        setattr(task, key, value)
+
+    db.commit()
+    db.refresh(task)
+
+    # Invalidate tasks cache
+    invalidate_user_cache(user.id, ["tasks"])
+
+    return task
+
 @router.put("/{task_id}/complete", response_model=TaskRead)
 def complete_task(
     request: Request,
@@ -268,6 +421,7 @@ def complete_task(
     # Get old value before update
     old_completed = task.completed
     task.completed = True
+    task.completed_at = datetime.utcnow()
 
     # פידבק קולי (ב‑frontend) – נשלח אירוע WebSocket, אבל כאן רק דוגמה:
     send_voice_feedback(
@@ -296,6 +450,44 @@ def complete_task(
     invalidate_user_cache(user.id, ["tasks"])
 
     return task
+
+
+@router.get("/progress-timeline")
+def progress_timeline(
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Timeline feed based on task before/after images and completion."""
+    safe_limit = max(1, min(limit, 100))
+    tasks = (
+        db.query(Task)
+        .filter(
+            Task.user_id == user.id,
+            Task.before_image_url.isnot(None),
+            Task.after_image_url.isnot(None),
+        )
+        .order_by(Task.after_image_at.desc().nullslast(), Task.updated_at.desc())
+        .limit(safe_limit)
+        .all()
+    )
+
+    timeline = []
+    for task in tasks:
+        timeline.append(
+            {
+                "task_id": task.id,
+                "task_title": task.title,
+                "room_id": task.room_id,
+                "before_image_url": task.before_image_url,
+                "after_image_url": task.after_image_url,
+                "before_image_at": task.before_image_at.isoformat() if task.before_image_at else None,
+                "after_image_at": task.after_image_at.isoformat() if task.after_image_at else None,
+                "completed": task.completed,
+                "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+            }
+        )
+    return timeline
 
 # Endpoint עבור ה‑todos המשויכים למשימה
 @router.get("/{task_id}/todos", response_model=List[TodoRead])

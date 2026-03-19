@@ -12,7 +12,7 @@
  */
 
 import sharp from 'sharp';
-import { readdir, stat, mkdir } from 'fs/promises';
+import { readdir, stat, mkdir, writeFile } from 'fs/promises';
 import { join, extname, dirname } from 'path';
 import { existsSync } from 'fs';
 
@@ -110,10 +110,19 @@ async function optimizeImage(inputPath, outputPath) {
       await mkdir(outputDir, { recursive: true });
     }
 
-    // Optimize image
-    await sharpInstance
-      .toFormat(options.format, options)
-      .toFile(outputPath);
+    // Optimize image. Sharp cannot read/write the same file path via toFile,
+    // so in in-place mode we render to a buffer and overwrite.
+    const isInPlace = inputPath === outputPath;
+    if (isInPlace) {
+      const optimizedBuffer = await sharpInstance
+        .toFormat(options.format, options)
+        .toBuffer();
+      await writeFile(outputPath, optimizedBuffer);
+    } else {
+      await sharpInstance
+        .toFormat(options.format, options)
+        .toFile(outputPath);
+    }
 
     // Get optimized size
     const optimizedStats = await stat(outputPath);

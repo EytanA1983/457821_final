@@ -22,6 +22,26 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import api from '../api';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
+
+// Local replacement for the broken generated-api hook
+function useTodos(taskId: number, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['todos', taskId],
+    queryFn: async () => {
+      const { data } = await api.get(`/tasks/${taskId}/todos`);
+      return data as { id: number; title: string; completed: boolean; position?: number }[];
+    },
+    enabled: options?.enabled ?? !!taskId,
+  });
+}
+
+interface Todo {
+  id: number;
+  title: string;
+  completed: boolean;
+  position?: number;
+}
 
 interface Task {
   id: number;
@@ -32,6 +52,7 @@ interface Task {
   category_id?: number;
   room_id?: number;
   position?: number;
+  todos?: Todo[];
 }
 
 interface DragDropTaskListProps {
@@ -47,7 +68,10 @@ interface SortableTaskItemProps {
 }
 
 const SortableTaskItem: React.FC<SortableTaskItemProps> = ({ task, onToggleComplete }) => {
-  const { t } = useTranslation('tasks');
+  // Fetch todos for this task
+  const { data: todos = [] } = useTodos(task.id, {
+    enabled: !!task.id,
+  });
   const {
     attributes,
     listeners,
@@ -96,6 +120,27 @@ const SortableTaskItem: React.FC<SortableTaskItemProps> = ({ task, onToggleCompl
               📅 {new Date(task.due_date).toLocaleDateString()}
             </p>
           )}
+          {/* Display todos if available */}
+          {todos.length > 0 && (
+            <div className="mt-2 space-y-1 pl-4 border-r-2 border-gray-200">
+              {todos.map((todo) => (
+                <label
+                  key={todo.id}
+                  className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-800 dark:hover:text-gray-200"
+                >
+                  <input
+                    type="checkbox"
+                    checked={todo.completed}
+                    readOnly
+                    className="h-3 w-3 text-sky-600 cursor-pointer"
+                  />
+                  <span className={todo.completed ? 'line-through opacity-60' : ''}>
+                    {todo.title}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
         </div>
         <div className="text-gray-400">⋮⋮</div>
       </div>
@@ -142,7 +187,7 @@ export const DragDropTaskList: React.FC<DragDropTaskListProps> = ({
     try {
       // Send reorder request to backend
       const taskIds = newTasks.map((task) => task.id);
-      await api.put('/api/drag-drop/tasks/reorder', {
+      await api.put('/drag-drop/tasks/reorder', {
         task_ids: taskIds,
         room_id: roomId,
         category_id: categoryId,
@@ -160,16 +205,31 @@ export const DragDropTaskList: React.FC<DragDropTaskListProps> = ({
   };
 
   const handleToggleComplete = async (taskId: number) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    // Optimistic update
+    const newCompleted = !task.completed;
+    setTasks((prevTasks) =>
+      prevTasks.map((t) =>
+        t.id === taskId ? { ...t, completed: newCompleted } : t
+      )
+    );
+
     try {
-      await api.put(`/api/tasks/${taskId}/complete`);
-      // Update local state
-      setTasks((prevTasks) =>
-        prevTasks.map((task) =>
-          task.id === taskId ? { ...task, completed: !task.completed } : task
-        )
-      );
+      // Use PATCH /api/tasks/{id} to toggle completion
+      await api.patch(`/tasks/${taskId}`, { completed: newCompleted });
+      // Update parent component
+      const updatedTasks = tasks.map((t) => (t.id === taskId ? { ...t, completed: newCompleted } : t)) as Task[];
+      onTasksUpdate?.(updatedTasks);
     } catch (error) {
       console.error('Failed to toggle task completion:', error);
+      // Revert on error
+      setTasks((prevTasks) =>
+        prevTasks.map((t) =>
+          t.id === taskId ? { ...t, completed: task.completed } : t
+        )
+      );
     }
   };
 

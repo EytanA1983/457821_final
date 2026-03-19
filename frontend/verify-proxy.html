@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vite Proxy Verification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover { background: #45a049; }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Vite Proxy Verification</h1>
+    
+    <div class="test">
+        <h2>Test 1: Current Port</h2>
+        <p id="port-result">Checking...</p>
+    </div>
+    
+    <div class="test">
+        <h2>Test 2: Proxy Configuration</h2>
+        <p id="config-result">Checking...</p>
+    </div>
+    
+    <div class="test">
+        <h2>Test 3: Health Check via Proxy</h2>
+        <button onclick="testProxy()">Test Proxy</button>
+        <pre id="proxy-result">Click "Test Proxy" to test...</pre>
+    </div>
+    
+    <div class="test">
+        <h2>Test 4: Direct Backend Check</h2>
+        <button onclick="testDirect()">Test Direct</button>
+        <pre id="direct-result">Click "Test Direct" to test...</pre>
+    </div>
+
+    <script>
+        // Test 1: Check port
+        const port = window.location.port;
+        const portResult = document.getElementById('port-result');
+        if (port === '5179') {
+            portResult.innerHTML = `<span class="success">✅ Port is correct: ${port}</span>`;
+        } else {
+            portResult.innerHTML = `<span class="warning">⚠️ Port is ${port}, expected 5179</span>`;
+        }
+        
+        // Test 2: Check configuration
+        const configResult = document.getElementById('config-result');
+        const isDev = import.meta.env.DEV;
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        configResult.innerHTML = `
+            <p><strong>Development mode:</strong> ${isDev ? '✅ Yes' : '❌ No'}</p>
+            <p><strong>VITE_API_URL:</strong> ${apiUrl || '(not set - using relative URLs)'}</p>
+            <p><strong>Expected behavior:</strong> ${isDev ? 'Use Vite proxy (relative URLs)' : 'Use direct URL'}</p>
+        `;
+        
+        // Test 3: Test proxy
+        async function testProxy() {
+            const result = document.getElementById('proxy-result');
+            result.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                
+                result.innerHTML = `
+<span class="success">✅ Proxy working!</span>
+Status: ${response.status} ${response.statusText}
+Response:
+${JSON.stringify(data, null, 2)}
+                `;
+            } catch (error) {
+                result.innerHTML = `
+<span class="error">❌ Proxy test failed</span>
+Error: ${error.message}
+
+Possible causes:
+1. Backend server is not running on http://localhost:8000
+2. Vite proxy is not configured correctly
+3. Network connectivity issue
+
+💡 Check:
+- Is backend running? curl http://localhost:8000/health
+- Check vite.config.ts proxy configuration
+- Check browser Network tab for request details
+                `;
+            }
+        }
+        
+        // Test 4: Test direct backend
+        async function testDirect() {
+            const result = document.getElementById('direct-result');
+            result.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch('http://localhost:8000/health');
+                const data = await response.json();
+                
+                result.innerHTML = `
+<span class="success">✅ Direct connection working!</span>
+Status: ${response.status} ${response.statusText}
+Response:
+${JSON.stringify(data, null, 2)}
+                `;
+            } catch (error) {
+                result.innerHTML = `
+<span class="error">❌ Direct connection failed</span>
+Error: ${error.message}
+
+This is expected if CORS is not configured.
+The proxy should handle this automatically.
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

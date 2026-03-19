@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from app.workers.celery_app import celery
 from app.db.session import SessionLocal
-from app.models.user import User
-from app.models.task import Task as TaskModel
-from app.models.notification import Notification, NotificationType
+from app.db.models.user import User
+from app.db.models.task import Task as TaskModel
+from app.db.models import Notification, NotificationType
 from app.services.redis_pubsub import redis_pubsub
 
 @celery.task(bind=True, name="app.celery_tasks.notifications.send_daily_notifications")

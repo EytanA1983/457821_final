@@ -167,7 +167,7 @@ cy.containsHebrew('חדר');
 ```typescript
 export default defineConfig({
   e2e: {
-    baseUrl: 'http://localhost:5178',
+    baseUrl: 'http://localhost:5179',
     viewportWidth: 1280,
     viewportHeight: 720,
     defaultCommandTimeout: 10000,
@@ -262,7 +262,7 @@ cypress:
       with:
         working-directory: frontend
         start: npm run dev
-        wait-on: 'http://localhost:5178'
+        wait-on: 'http://localhost:5179'
 ```
 
 ## Debugging

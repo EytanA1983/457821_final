@@ -20,11 +20,22 @@ from app.db.models.room import Room, RoomShare
 # Task-related models
 from app.db.models.task import Task, Recurrence
 
+# Inventory
+from app.db.models.inventory import InventoryArea, InventoryItem
+
+# Emotional journal
+from app.db.models.emotional_journal import EmotionalJournalEntry
+
+# Daily focus
+from app.db.models.daily_focus import DailyFocus
+
 # Todo (sub-tasks)
 from app.db.models.todo import Todo
 
 # Notification subscription
 from app.db.models.notification import NotificationSubscription
+# Notification model
+from app.db.models.notification_model import Notification, NotificationType
 
 # Audit logging
 from app.db.models.audit import AuditLog, AuditAction
@@ -55,10 +66,19 @@ __all__ = [
     # Task
     "Task",
     "Recurrence",
+    # Inventory
+    "InventoryArea",
+    "InventoryItem",
+    # Emotional journal
+    "EmotionalJournalEntry",
+    # Daily focus
+    "DailyFocus",
     # Todo
     "Todo",
     # Notification
     "NotificationSubscription",
+    "Notification",
+    "NotificationType",
     # Audit
     "AuditLog",
     "AuditAction",

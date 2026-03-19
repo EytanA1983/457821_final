@@ -1,7 +1,10 @@
 import { memo, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { getRoomRoute } from '../utils/routes';
 import { useTasks } from '../hooks/useTasks';
+import type { TaskRead } from '../schemas/task';
+import styles from './RoomCard.module.css';
 
 type Props = { 
   roomId: number; 
@@ -61,33 +64,48 @@ const detectRoomType = (roomName: string): RoomType => {
   return 'default';
 };
 
-// Room emoji mapping (static, no need to recreate)
-const roomEmojis: Readonly<Record<RoomType, string>> = {
-  living: '🛋️',
-  kitchen: '🍳',
-  bedroom: '🛏️',
-  bathroom: '🚿',
-  office: '💼',
-  balcony: '🌿',
-  closet: '🚪',
-  kids: '🧸',
-  laundry: '🧺',
-  garage: '🚗',
-  default: '🏠',
+const getRoomSubtitle = (roomType: RoomType, isEnglish: boolean): string => {
+  switch (roomType) {
+    case 'living':
+      return isEnglish ? 'Living room - room to breathe' : 'סלון — אוויר לנשימה';
+    case 'kitchen':
+      return isEnglish ? 'Kitchen - small order that calms the day' : 'מטבח — סדר קטן שמרגיע את היום';
+    case 'bedroom':
+      return isEnglish ? 'Bedroom - calm starts in the closet' : 'חדר שינה — שקט שמתחיל בארון';
+    case 'bathroom':
+      return isEnglish ? 'Bathroom - quick clean, fresh feeling' : 'אמבטיה — ניקיון קל, תחושת רעננות';
+    case 'office':
+      return isEnglish ? 'Office - focused space without clutter' : 'משרד — מיקוד נעים בלי עומס';
+    case 'balcony':
+      return isEnglish ? 'Balcony - a light corner to clear your mind' : 'מרפסת — פינה קלה לניקוי הראש';
+    case 'closet':
+      return isEnglish ? 'Closet - fewer items, less pressure' : 'ארון — פחות חפצים, פחות לחצים';
+    case 'kids':
+      return isEnglish ? 'Kids room - one toy at a time' : 'חדר ילדים — צעצוע אחד בכל פעם';
+    case 'laundry':
+      return isEnglish ? 'Laundry - a few calm minutes of folding' : 'מכבסה — כמה דקות של קיפול שקט';
+    case 'garage':
+      return isEnglish ? 'Garage - functional and clean order' : 'מוסך — סדר פונקציונלי ונקי';
+    default:
+      return isEnglish ? 'Personal space for a calm daily reset' : 'מרחב אישי לסדר יומי רגוע';
+  }
 };
 
 // Get CSS variable for room type
 const getRoomStyle = (roomType: RoomType, customColor?: string): React.CSSProperties => {
   if (customColor) {
     return {
-      background: customColor,
-      '--room-text': '#ffffff',
+      background: 'var(--color-surface)',
+      color: 'var(--color-text)',
+      border: `1px solid ${customColor}`,
+      '--room-accent': customColor,
     } as React.CSSProperties;
   }
   
   return {
-    background: `var(--room-${roomType}-bg)`,
-    color: `var(--room-${roomType}-text)`,
+    background: 'var(--color-surface)',
+    color: 'var(--color-text)',
+    border: '1px solid var(--color-border)',
     '--room-accent': `var(--room-${roomType}-accent)`,
   } as React.CSSProperties;
 };
@@ -116,34 +134,35 @@ const ProgressText = memo(({
   progress, 
   isComplete, 
   isLoading, 
-  taskCount 
+  taskCount,
+  completedCount,
+  labels,
 }: { 
   progress: number; 
   isComplete: boolean; 
   isLoading: boolean;
   taskCount: number;
+  completedCount: number;
+  labels: {
+    complete: string;
+    loading: string;
+    noTasks: string;
+    completedSuffix: string;
+  };
 }) => (
   <div className="flex items-center justify-between mt-2">
-    <p className="text-sm font-medium opacity-90">
+    <p className="text-sm text-gray-600 dark:text-gray-300">
       {isComplete ? (
-        <span className="flex items-center gap-1">
-          <span className="emoji">🎉</span>
-          <span>הושלם!</span>
-        </span>
+        <span>{labels.complete}</span>
       ) : isLoading ? (
-        <span className="flex items-center gap-1">
-          <span className="animate-pulse">טוען...</span>
-        </span>
+        <span className="animate-pulse">{labels.loading}</span>
       ) : taskCount === 0 ? (
-        <span className="flex items-center gap-1">
-          <span className="emoji">📝</span>
-          <span>אין משימות</span>
-        </span>
+        <span>{labels.noTasks}</span>
       ) : (
-        <span>{progress}% הושלמו</span>
+        <span>{progress}% {labels.completedSuffix}</span>
       )}
     </p>
-    <span className="emoji text-lg">{isComplete ? '✅' : '📋'}</span>
+    <span className="text-xs text-gray-500 dark:text-gray-400">{completedCount}/{taskCount}</span>
   </div>
 ));
 ProgressText.displayName = 'ProgressText';
@@ -156,8 +175,8 @@ const TaskCountBadge = memo(({ completed, total }: { completed: number; total: n
     <div 
       className="absolute top-2 right-2 px-2 py-0.5 text-xs font-bold rounded-full"
       style={{ 
-        backgroundColor: 'var(--room-accent, rgba(0,0,0,0.2))',
-        color: 'white'
+        backgroundColor: 'var(--room-accent, #3b82f6)',
+        color: '#fff'
       }}
     >
       {completed}/{total}
@@ -168,19 +187,34 @@ TaskCountBadge.displayName = 'TaskCountBadge';
 
 // Main RoomCard component with React.memo
 const RoomCardComponent = ({ roomId, name, customColor }: Props) => {
+  const { i18n } = useTranslation();
+  const isEnglish = (i18n.resolvedLanguage || i18n.language || 'he').startsWith('en');
   const { data: tasks = [], isLoading } = useTasks({ roomId });
+  const labels = isEnglish
+    ? {
+        complete: 'Completed',
+        loading: 'Loading...',
+        noTasks: 'No tasks yet',
+        completedSuffix: 'completed',
+      }
+    : {
+        complete: 'הושלם',
+        loading: 'טוען...',
+        noTasks: 'אין משימות',
+        completedSuffix: 'הושלמו',
+      };
 
   // Memoized calculations
   const roomType = useMemo(() => detectRoomType(name), [name]);
-  const emoji = roomEmojis[roomType];
   const roomStyle = useMemo(() => getRoomStyle(roomType, customColor), [roomType, customColor]);
+  const roomSubtitle = useMemo(() => getRoomSubtitle(roomType, isEnglish), [roomType, isEnglish]);
   
   // Memoize task statistics
   const { progress, completedCount, isComplete } = useMemo(() => {
     if (!tasks || tasks.length === 0) {
       return { progress: 0, completedCount: 0, isComplete: false };
     }
-    const completed = tasks.filter((t: any) => t.completed).length;
+    const completed = tasks.filter((t: TaskRead) => t.completed).length;
     const prog = Math.round((completed / tasks.length) * 100);
     return { 
       progress: prog, 
@@ -192,17 +226,22 @@ const RoomCardComponent = ({ roomId, name, customColor }: Props) => {
   return (
     <Link 
       to={getRoomRoute(roomId)} 
-      className="
-        block p-5 rounded-xl shadow-md relative
-        hover:shadow-lg transition-all transform hover:scale-105
-        focus:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2
-      "
+      className={`
+        ${styles.card}
+        block relative
+        focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2
+        touch-target
+      `}
       style={roomStyle}
     >
+      <div className={`${styles.cover} wow-fadeIn`} />
+
       {/* Room header */}
-      <div className="flex items-center gap-3 mb-3">
-        <span className="emoji text-3xl drop-shadow-sm">{emoji}</span>
-        <h3 className="font-semibold text-lg truncate">{name}</h3>
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h3 className={`${styles.title} truncate`}>{name}</h3>
+          <p className={styles.subtitle}>{roomSubtitle}</p>
+        </div>
       </div>
       
       {/* Progress bar */}
@@ -214,6 +253,8 @@ const RoomCardComponent = ({ roomId, name, customColor }: Props) => {
         isComplete={isComplete} 
         isLoading={isLoading}
         taskCount={tasks.length}
+        completedCount={completedCount}
+        labels={labels}
       />
       
       {/* Task count badge */}

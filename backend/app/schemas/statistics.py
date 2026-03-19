@@ -86,3 +86,10 @@ class OverallStatistics(BaseModel):
     by_time: TimeBasedStatistics
     distributions: Dict[str, List[DistributionItem]]
     averages: Dict[str, float]
+
+
+class HomeSummaryStatistics(BaseModel):
+    """Simple KPI stats for the home dashboard."""
+    completed_tasks: int
+    organized_rooms: int
+    donated_items: int

@@ -119,7 +119,7 @@ export const DragDropCategoryList: React.FC<DragDropCategoryListProps> = ({
     try {
       // Send reorder request to backend
       const categoryIds = newCategories.map((cat) => cat.id);
-      await api.put('/api/drag-drop/categories/reorder', {
+      await api.put('/drag-drop/categories/reorder', {
         category_ids: categoryIds,
       });
 

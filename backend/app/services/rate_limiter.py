@@ -179,6 +179,31 @@ class RateLimiter:
             logger.error(f"Error getting lockout TTL: {e}")
             return None
 
+    def get_failed_attempt_count(self, identifier: str) -> int:
+        """Get current failed attempt count WITHOUT incrementing it"""
+        if not self.redis_client:
+            return 0
+
+        try:
+            key = self._get_key("brute_force", identifier)
+            attempts = self.redis_client.get(key)
+            return int(attempts) if attempts else 0
+        except Exception as e:
+            logger.error(f"Error getting failed attempt count: {e}")
+            return 0
+
+    def is_locked_out(self, identifier: str) -> bool:
+        """Check if account is locked out WITHOUT recording a new attempt"""
+        if not self.redis_client:
+            return False
+
+        try:
+            attempt_count = self.get_failed_attempt_count(identifier)
+            return attempt_count >= settings.BRUTE_FORCE_MAX_ATTEMPTS
+        except Exception as e:
+            logger.error(f"Error checking lockout status: {e}")
+            return False
+
 
 # Global instance
 rate_limiter = RateLimiter()

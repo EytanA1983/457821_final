@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from app.workers.celery_app import celery
 from app.db.session import SessionLocal
-from app.models.user import User
-from app.models.task import Task as TaskModel
+from app.db.models.user import User
+from app.db.models.task import Task as TaskModel
 from app.services.google_calendar import GoogleCalendarService
 from app.services.redis_pubsub import redis_pubsub
 

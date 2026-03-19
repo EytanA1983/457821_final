@@ -1,0 +1,112 @@
+:root{
+  --bg:#FAF9F7;
+  --card:#FFFFFF;
+  --text:#1C1C1C;
+  --muted:#6B6B6B;
+  --accent:#A07CFE;
+  --accentSoft:#F1ECFF;
+  --border:#EAEAEA;
+
+  --radiusLg:26px;
+  --radiusMd:14px;
+
+  --shadowSm:0 8px 24px rgba(0,0,0,.06);
+  --shadowMd:0 22px 70px rgba(0,0,0,.10);
+
+  --container:1100px;
+}
+
+@media (prefers-reduced-motion: no-preference){
+  :root{ --t: 220ms; }
+}
+@media (prefers-reduced-motion: reduce){
+  :root{ --t: 0ms; }
+}
+
+.wow-card{
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radiusLg);
+  box-shadow: var(--shadowSm);
+  overflow: hidden;
+}
+
+.wow-card::before{
+  content:"";
+  position:absolute;
+  inset:-2px;
+  background: radial-gradient(600px 260px at 20% 0%, rgba(160,124,254,.20), transparent 60%),
+              radial-gradient(520px 260px at 90% 10%, rgba(107,191,138,.10), transparent 60%);
+  pointer-events:none;
+  opacity:.55;
+}
+
+.wow-pad{ padding: 20px; }
+
+.wow-title{
+  font-family:"Playfair Display", Georgia, serif;
+  font-weight:500;
+  letter-spacing:.2px;
+}
+
+.wow-muted{ color: var(--muted); }
+
+.wow-fadeIn{
+  animation: wowIn var(--t) ease both;
+}
+@keyframes wowIn{
+  from{ opacity:0; transform: translateY(6px); }
+  to{ opacity:1; transform: translateY(0); }
+}
+
+/* Buttons */
+.wow-btn{
+  border: 1px solid var(--border);
+  background:#fff;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor:pointer;
+  transition: transform var(--t) ease, box-shadow var(--t) ease, border-color var(--t) ease, opacity var(--t) ease;
+  box-shadow: 0 10px 26px rgba(0,0,0,.06);
+}
+.wow-btn:hover{ transform: translateY(-1px); box-shadow: 0 18px 44px rgba(0,0,0,.10); }
+.wow-btn:active{ transform: translateY(0px) scale(.99); }
+.wow-btnPrimary{
+  background: var(--accent);
+  color:#fff;
+  border-color: rgba(160,124,254,.35);
+  box-shadow: 0 18px 48px rgba(160,124,254,.30);
+}
+.wow-btnPrimary:hover{ box-shadow: 0 26px 70px rgba(160,124,254,.35); }
+
+.wow-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background:#fff;
+  font-weight: 700;
+  font-size: 12px;
+}
+.wow-chipAccent{
+  background: var(--accentSoft);
+  border-color: rgba(160,124,254,.35);
+  color:#4A2BC7;
+}
+
+/* Skeleton */
+.wow-skeleton{
+  border-radius: 14px;
+  background: linear-gradient(90deg, rgba(0,0,0,.04), rgba(0,0,0,.07), rgba(0,0,0,.04));
+  background-size: 200% 100%;
+  animation: shimmer 1.3s ease infinite;
+}
+@keyframes shimmer{
+  0%{ background-position: 200% 0; }
+  100%{ background-position: -200% 0; }
+}
+

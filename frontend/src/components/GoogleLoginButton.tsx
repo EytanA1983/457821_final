@@ -16,7 +16,7 @@ export const GoogleLoginButton = () => {
   }, []);
 
   const openOAuth = async () => {
-    const { data } = await api.get('/api/auth/google/login');
+    const { data } = await api.get('/auth/google/login');
     const popup = window.open(data.auth_url, 'google_oauth', 'width=500,height=600');
 
     if (!popup) {

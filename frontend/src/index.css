@@ -10,53 +10,79 @@
  */
 
 /* ==================== 1. FONTS ==================== */
-/* Hebrew optimized fonts - loaded first for performance */
-@import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700&family=Rubik:wght@300;400;500;600;700&family=Heebo:wght@300;400;500;600;700&display=swap');
+/* Fonts are loaded from index.html */
+
+/* ==================== 1.5 THEME ==================== */
+/* Theme CSS variables - loaded before Tailwind */
+@import "./styles/theme.css";
+
+/* ==================== 1.6 UI SYSTEM ==================== */
+/* Base UI components (SaaS feel) */
+@import "./styles/ui-system.css";
+
+/* ==================== 1.7 LAYOUT SYSTEM ==================== */
+/* Layout helpers (Stack, Grid, etc.) */
+@import "./styles/layout-system.css";
+
+/* ==================== 1.8 UI COMPONENTS (Legacy) ==================== */
+/* Legacy UI components (for backward compatibility) */
+@import "./styles/ui.css";
 
 /* ==================== 2. TAILWIND ==================== */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ==================== 2.2 TAILWIND @apply (only in module) ==================== */
-@import './styles/tailwind-apply.module.css';
-
-/* ==================== 2.5 RESPONSIVE UTILITIES ==================== */
-@import './styles/responsive.css';
-
-/* ==================== 2.6 GRID FALLBACKS ==================== */
-/* Flexbox fallbacks for older browsers (IE11) */
-@import './styles/grid-fallback.css';
-
 /* ==================== 3. BASE LAYER ==================== */
 @layer base {
   /* Root variables for easy theming */
   :root {
-    /* Primary colors */
-    --color-primary: #3b82f6;
-    --color-primary-hover: #2563eb;
-    --color-primary-active: #1d4ed8;
-    --color-secondary: #10b981;
-    --color-secondary-hover: #059669;
-    --color-secondary-active: #047857;
+    /* Design system tokens (global) */
+    --bg: #FAF9F7;
+    --card: #FFFFFF;
+    --text: #1C1C1C;
+    --muted: #6B6B6B;
+    --accent: #A07CFE;
+    --accentSoft: #F1ECFF;
+    --border: #EAEAEA;
+    --success: #6BBF8A;
+    --warning: #E6B655;
+    --danger: #D96B6B;
+    --radius-lg: 22px;
+    --radius-md: 14px;
+    --shadow-sm: 0 6px 18px rgba(0,0,0,0.05);
+    --shadow-md: 0 16px 50px rgba(0,0,0,0.08);
+    --container: 1100px;
 
-    /* Light mode colors */
-    --color-cream: #FAF3E0;
-    --color-sky: #AEDFF7;
-    --color-mint: #B4E7B5;
-    --color-blush: #F7C6C6;
-    --color-earth: #D4A574;
+    /* Compatibility aliases for existing app styles */
+    --bg-primary: var(--bg);
+    --bg-card: var(--card);
+    --text-primary: var(--text);
+    --text-secondary: var(--muted);
+    --accent-primary: var(--accent);
+    --accent-soft: var(--accentSoft);
+    --border-soft: var(--border);
 
-    /* Light mode semantic colors */
-    --color-bg: #ffffff;
-    --color-surface: #FFFFFF;
-    --color-text: #1f2937;
-    --color-text-muted: #6b7280;
-    --color-border: #e5e7eb;
-    --color-shadow: rgba(0, 0, 0, 0.1);
+    /* Backward-compatible semantic aliases used by existing components */
+    --color-primary: var(--accent-primary);
+    --color-primary-hover: #8D66F3;
+    --color-primary-active: #7A52E7;
+    --color-secondary: var(--success);
+    --color-secondary-hover: #54A975;
+    --color-secondary-active: #3E9461;
+    --color-bg: var(--bg-primary);
+    --color-surface: var(--bg-card);
+    --color-text: var(--text-primary);
+    --color-text-muted: var(--text-secondary);
+    --color-border: var(--border-soft);
+    --color-shadow: rgba(28, 28, 28, 0.07);
 
     /* Theme transition timing */
     --theme-transition: 0.2s ease;
+
+    /* Typography */
+    --font-main: 'Inter', 'Assistant', system-ui, -apple-system, sans-serif;
+    --font-heading: 'Playfair Display', 'Cormorant', 'Assistant', serif;
 
     /* ===== Room Color Schemes (Light Mode) ===== */
 
@@ -138,37 +164,46 @@
     --room-default-accent: #4a9960;
 
     /* Progress bar colors */
-    --progress-bg: var(--color-cream);
-    --progress-fill: linear-gradient(90deg, var(--color-sky), #7BC4E8);
-    --progress-complete: linear-gradient(90deg, #10B981, #34D399);
+    --progress-bg: #f1ede8;
+    --progress-fill: linear-gradient(90deg, var(--accent-soft), var(--accent-primary));
+    --progress-complete: linear-gradient(90deg, #5DBA82, var(--success));
   }
 
   /* Dark mode - applies when html has .dark class OR [data-theme='dark'] attribute */
   /* WCAG AA compliant: All text has contrast ratio >= 4.5:1 */
   .dark,
   [data-theme='dark'] {
-    /* Primary colors (adjusted for dark mode) */
-    --color-primary: #60a5fa;
-    --color-primary-hover: #3b82f6;
-    --color-primary-active: #2563eb;
-    --color-secondary: #34d399;
-    --color-secondary-hover: #10b981;
-    --color-secondary-active: #059669;
+    --bg: #171718;
+    --card: #222225;
+    --text: #f5f5f5;
+    --muted: #c4c4c7;
+    --accent: #B49AFF;
+    --accentSoft: #3b3158;
+    --border: #34343a;
 
-    /* Dark mode semantic colors */
-    --color-bg: #111827;        /* gray-900 - ensures high contrast with light text */
-    --color-surface: #1f2937;   /* gray-800 - better contrast than #2d2d2d */
-    --color-text: #f3f4f6;      /* gray-100 - 15.8:1 contrast on gray-900 */
-    --color-text-muted: #d1d5db; /* gray-300 - 7.1:1 contrast on gray-900, 4.8:1 on gray-800 */
-    --color-border: #404040;
-    --color-shadow: rgba(0, 0, 0, 0.3);
+    --bg-primary: #171718;
+    --bg-card: #222225;
+    --text-primary: #f5f5f5;
+    --text-secondary: #c4c4c7;
+    --accent-primary: #B49AFF;
+    --accent-soft: #3b3158;
+    --border-soft: #34343a;
+    --success: #78c796;
+    --warning: #f2c56b;
+    --danger: #e08787;
 
-    /* Adjust colors for dark mode */
-    --color-cream: #2d2d2d;
-    --color-sky: #3b82f6;
-    --color-mint: #22c55e;
-    --color-blush: #f43f5e;
-    --color-earth: #d97706;
+    --color-primary: var(--accent-primary);
+    --color-primary-hover: #A88BFF;
+    --color-primary-active: #9571FF;
+    --color-secondary: var(--success);
+    --color-secondary-hover: #66b989;
+    --color-secondary-active: #52a776;
+    --color-bg: var(--bg-primary);
+    --color-surface: var(--bg-card);
+    --color-text: var(--text-primary);
+    --color-text-muted: var(--text-secondary);
+    --color-border: var(--border-soft);
+    --color-shadow: rgba(0, 0, 0, 0.28);
 
     /* ===== Room Color Schemes (Dark Mode) ===== */
 
@@ -250,9 +285,9 @@
     --room-default-accent: #6ab77b;
 
     /* Progress bar colors */
-    --progress-bg: #1a1a1a;
-    --progress-fill: linear-gradient(90deg, #3b82f6, #60a5fa);
-    --progress-complete: linear-gradient(90deg, #059669, #10B981);
+    --progress-bg: #2c2c31;
+    --progress-fill: linear-gradient(90deg, var(--accent-soft), var(--accent-primary));
+    --progress-complete: linear-gradient(90deg, #5fae84, var(--success));
   }
 
   /* Theme transition styles - added by ThemeProvider after mount */
@@ -281,14 +316,198 @@
 
   /* Global scrollbar styling */
   * {
+    box-sizing: border-box;
     scrollbar-width: thin;
     scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+  }
+
+  html, body {
+    height: 100%;
+  }
+
+  /* Base body styles using theme variables */
+  body {
+    margin: 0;
+    font-family: var(--font-main);
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-heading);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    margin: 0;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
   }
 
 }
 
 /* ==================== 4. COMPONENTS LAYER ==================== */
-/* Note: Tailwind @apply rules moved to ./styles/tailwind-apply.module.css */
+@layer components {
+  .container,
+  .page-container {
+    max-width: var(--container);
+    margin-left: auto;
+    margin-right: auto;
+    padding: 28px 20px;
+  }
+
+  .card,
+  .surface-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .cardPad {
+    padding: 22px;
+  }
+
+  .label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .input {
+    width: 100%;
+    padding: 14px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: #fff;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .input:focus {
+    border-color: rgba(160, 124, 254, 0.55);
+    box-shadow: 0 0 0 6px rgba(160, 124, 254, 0.12);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border: 0;
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  }
+
+  .btnPrimary {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(160, 124, 254, 0.28);
+  }
+
+  .btnPrimary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 16px 34px rgba(160, 124, 254, 0.34);
+  }
+
+  .btnPrimary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btnGhost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: var(--accentSoft);
+    color: #4A2BC7;
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  .auth-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-primary);
+    padding: 1.5rem;
+  }
+
+  .auth-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--bg-card);
+    padding: 3rem;
+    border-radius: 24px;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.05);
+    text-align: center;
+    border: 1px solid var(--border-soft);
+  }
+
+  .auth-title {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+  }
+
+  .auth-subtitle {
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    line-height: 1.6;
+  }
+
+  .auth-input {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border-soft);
+    background: #fff;
+    color: var(--text-primary);
+    outline: none;
+  }
+
+  .auth-input:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(160, 124, 254, 0.15);
+  }
+
+  .btn-primary {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    background: var(--accent-primary);
+    color: #fff;
+    border: none;
+    font-weight: 500;
+    transition: all 0.25s ease;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(160, 124, 254, 0.4);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+}
 
 /* ==================== 5. UTILITIES LAYER ==================== */
 @layer utilities {
@@ -381,6 +600,40 @@
   .touch-target-sm {
     min-width: 36px;
     min-height: 36px;
+  }
+
+  /* ==================== MOBILE OPTIMIZATIONS ==================== */
+  
+  /* Prevent zoom on input focus (iOS Safari) - font-size >= 16px */
+  @media (max-width: 768px) {
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="date"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="url"],
+    input[type="search"],
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Smooth scrolling on mobile */
+  @media (max-width: 768px) {
+    html {
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
+  }
+
+  /* Better tap highlighting */
+  @media (max-width: 768px) {
+    a, button, [role="button"] {
+      -webkit-tap-highlight-color: rgba(59, 130, 246, 0.3);
+      tap-highlight-color: rgba(59, 130, 246, 0.3);
+    }
   }
 
   /* Reduced motion - respect user preferences */

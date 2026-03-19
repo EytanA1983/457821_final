@@ -126,7 +126,7 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
     try {
       // Send reorder request to backend
       const todoIds = newTodos.map((todo) => todo.id);
-      await api.put('/api/drag-drop/todos/reorder', {
+      await api.put('/drag-drop/todos/reorder', {
         todo_ids: todoIds,
         task_id: taskId,
       });

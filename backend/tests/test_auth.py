@@ -14,7 +14,7 @@ class TestUserRegistration:
     
     @pytest.mark.auth
     def test_register_user_success(self, client, db: Session):
-        """Test successful user registration"""
+        """Test successful user registration returns tokens"""
         response = client.post(
             "/api/auth/register",
             json={
@@ -24,9 +24,98 @@ class TestUserRegistration:
         )
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
-        assert data["email"] == "newuser@example.com"
-        assert "id" in data
-        assert "hashed_password" not in data  # Password should not be returned
+        # Registration endpoint returns Token, not User
+        assert "access_token" in data
+        assert "refresh_token" in data
+        assert data["token_type"] == "bearer"
+        assert "expires_in" in data
+    
+    @pytest.mark.auth
+    def test_register_returns_tokens_immediately(self, client, db: Session):
+        """Test that registration returns access + refresh tokens immediately"""
+        response = client.post(
+            "/api/auth/register",
+            json={
+                "email": f"token-test-{__import__('time').time()}@example.com",
+                "password": "securepassword123",
+            }
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        
+        # Verify tokens are returned
+        assert "access_token" in data
+        assert "refresh_token" in data
+        assert data["token_type"] == "bearer"
+        assert "expires_in" in data
+        assert isinstance(data["expires_in"], int)
+        assert data["expires_in"] > 0
+        
+        # Verify tokens are not empty
+        assert len(data["access_token"]) > 0
+        assert len(data["refresh_token"]) > 0
+    
+    @pytest.mark.auth
+    def test_register_then_verify_with_me_endpoint(self, client, db: Session):
+        """
+        Test complete flow: Register → GET /api/auth/me with token
+        This verifies:
+        1. Registration creates user in database
+        2. Registration returns valid tokens
+        3. Token works with /api/auth/me endpoint
+        """
+        test_email = f"me-test-{__import__('time').time()}@example.com"
+        test_password = "securepassword123"
+        
+        # Step 1: Register user
+        register_response = client.post(
+            "/api/auth/register",
+            json={
+                "email": test_email,
+                "password": test_password,
+            }
+        )
+        assert register_response.status_code == status.HTTP_201_CREATED
+        register_data = register_response.json()
+        
+        # Verify tokens are returned
+        assert "access_token" in register_data
+        assert "refresh_token" in register_data
+        access_token = register_data["access_token"]
+        refresh_token = register_data["refresh_token"]
+        
+        # Verify tokens are not empty
+        assert len(access_token) > 0
+        assert len(refresh_token) > 0
+        
+        # Step 2: Verify user was created in database
+        from app.db.models import User
+        user = db.query(User).filter(User.email == test_email).first()
+        assert user is not None, "User should be created in database"
+        assert user.email == test_email
+        assert user.is_active is True
+        
+        # Step 3: Use access_token to call /api/auth/me
+        me_response = client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        assert me_response.status_code == status.HTTP_200_OK
+        me_data = me_response.json()
+        
+        # Verify /api/auth/me returns correct user data
+        assert me_data["email"] == test_email
+        assert me_data["id"] == user.id
+        assert me_data["is_active"] is True
+        assert "hashed_password" not in me_data  # Password should never be returned
+        assert "password" not in me_data  # Password should never be returned
+        
+        # Verify token is valid and working
+        assert me_data["id"] is not None
+        assert isinstance(me_data["id"], int)
+        
+        print(f"✅ Registration successful: User ID {me_data['id']}, Email {me_data['email']}")
+        print(f"✅ Token verification successful: /api/auth/me returned user data")
     
     @pytest.mark.auth
     def test_register_duplicate_email(self, client, test_user: User):

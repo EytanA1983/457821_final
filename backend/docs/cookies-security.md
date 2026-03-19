@@ -90,7 +90,7 @@ def logout(response: Response):
 ```python
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5178", ...],
+    allow_origins=["http://localhost:5179", ...],
     allow_credentials=True,  # REQUIRED for cookies!
     allow_methods=["*"],
     allow_headers=["*"],
@@ -225,7 +225,7 @@ access_token=...; Path=/; SameSite=Strict; Secure; HttpOnly
 
 ### Cookies לא נשלחים ב-Cross-Origin
 
-**בעיה:** Cookies לא נשלחים מ-`http://localhost:5178` ל-`http://localhost:8000`
+**בעיה:** Cookies לא נשלחים מ-`http://localhost:5179` ל-`http://localhost:8000`
 
 **פתרון:**
 1. ודא `allow_credentials=True` ב-CORS

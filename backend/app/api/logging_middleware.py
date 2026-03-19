@@ -35,7 +35,11 @@ class LoggingMiddleware(BaseHTTPMiddleware):
     SKIP_PATHS = {"/health", "/metrics", "/favicon.ico"}
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        # Skip logging for health checks
+        # Skip logging for OPTIONS (CORS preflight) and health checks
+        # CRITICAL: OPTIONS requests must pass through without logging to avoid 500 errors
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        
         if request.url.path in self.SKIP_PATHS:
             return await call_next(request)
         

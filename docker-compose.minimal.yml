@@ -1,0 +1,38 @@
+name: eli-maor
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/eli_maor
+      - REDIS_URL=redis://redis:6379/0
+    networks:
+      - app-network
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A app.workers.celery_app.celery worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/eli_maor
+      - REDIS_URL=redis://redis:6379/0
+    networks:
+      - app-network
+
+  beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A app.workers.celery_app.celery beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/eli_maor
+      - REDIS_URL=redis://redis:6379/0
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

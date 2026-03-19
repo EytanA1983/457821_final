@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from app.db.base import Base
 from app.config import settings
 from app.db.models import (
-    User, Category, Room, Task, Todo, NotificationSubscription, RefreshToken
+    User, Category, Room, Task, Todo, NotificationSubscription, RefreshToken, Notification
 )
 
 # this is the Alembic Config object

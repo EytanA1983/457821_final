@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 from typing import Optional, List
 from pydantic_settings import BaseSettings
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 
 def get_secret_with_fallback(key: str, default: str = "") -> str:
@@ -61,8 +61,12 @@ class Settings(BaseSettings):
         default=False,  # Default to False for security
         description="Debug mode (set to true only in development)"
     )
+    ENV: str = Field(
+        default="development",
+        description="Environment: development, staging, production. Alias for ENVIRONMENT."
+    )
     ENVIRONMENT: str = Field(
-        default="production",
+        default="development",
         description="Environment: development, staging, production"
     )
 
@@ -70,12 +74,12 @@ class Settings(BaseSettings):
     # SECURITY SETTINGS (SENSITIVE!)
     # =====================================================
     SECRET_KEY: str = Field(
-        default="",  # MUST be set via environment
-        description="Secret key for JWT tokens - MUST BE SET!"
+        default="dev-secret-key",  # Development fallback - MUST be overridden in production
+        description="Secret key for JWT tokens - MUST BE SET in production!"
     )
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
-        default=15,
-        description="Access token expiry in minutes (10-15 minutes recommended)"
+        default=60,  # Default 60 for dev, should be 30 for prod
+        description="Access token expiry in minutes (30 recommended for production, 60 for development)"
     )
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(
         default=30,
@@ -90,8 +94,8 @@ class Settings(BaseSettings):
     # DATABASE (SENSITIVE!)
     # =====================================================
     DATABASE_URL: str = Field(
-        default="",  # MUST be set via environment
-        description="Database connection URL - MUST BE SET!"
+        default="sqlite:///./dev.db",  # Development fallback - MUST be overridden in production
+        description="Database connection URL - MUST BE SET in production!"
     )
 
     # =====================================================
@@ -318,18 +322,82 @@ class Settings(BaseSettings):
     AI_MAX_TOKENS: int = Field(default=1000)
 
     # =====================================================
+    # YOUTUBE CONTENT
+    # =====================================================
+    YOUTUBE_API_KEY: str = Field(
+        default="",
+        description="YouTube Data API v3 key"
+    )
+    YOUTUBE_HANDLE: str = Field(
+        default="@EliMaor555",
+        description="Preferred YouTube channel handle for recommendations"
+    )
+
+    # =====================================================
     # FRONTEND / CORS
     # =====================================================
     FRONTEND_URL: str = Field(default="http://localhost:3000")
     CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:5178"]
+        default=[
+            "http://localhost:5179",   # Custom Vite port (primary)
+            "http://127.0.0.1:5179",   # Custom Vite port (IP)
+            "http://localhost:5178",   # Alternative Vite port
+            "http://127.0.0.1:5178",   # Alternative Vite port (IP)
+            "http://localhost:5181",   # Alternate Vite port
+            "http://127.0.0.1:5181",   # Alternate Vite port (IP)
+            "http://localhost:5173",   # Vite default port
+            "http://127.0.0.1:5173",   # Vite default port (IP)
+            "http://localhost:3000",   # Create React App default
+            "http://127.0.0.1:3000",   # Create React App default (IP)
+            # HTTPS origins (for development with SSL)
+            "https://localhost:8000",  # Backend HTTPS
+            "https://localhost:5179",  # Frontend HTTPS (if configured)
+            "https://127.0.0.1:8000",  # Backend HTTPS (IP)
+            "https://127.0.0.1:5179",  # Frontend HTTPS (IP)
+        ],
+        description="Allowed CORS origins. Can be overridden via CORS_ORIGINS environment variable (JSON array string). "
+                   "IMPORTANT: Cannot contain '*' when allow_credentials=True (CORS spec requirement). "
+                   "In production, should only include your production domain."
     )
+
+    @field_validator("CORS_ORIGINS")
+    @classmethod
+    def validate_cors_origins(cls, v: List[str]) -> List[str]:
+        """
+        Validate CORS origins to prevent wildcard '*' when allow_credentials=True.
+        
+        CORS specification: allow_origins=["*"] is incompatible with allow_credentials=True.
+        This validator ensures we use specific origins instead of wildcard.
+        """
+        if not isinstance(v, list):
+            raise ValueError("CORS_ORIGINS must be a list of strings")
+        
+        # Check for wildcard
+        if "*" in v or any(origin == "*" for origin in v):
+            raise ValueError(
+                "CORS_ORIGINS cannot contain '*' when allow_credentials=True. "
+                "Please specify explicit origins (e.g., ['http://localhost:5179'])."
+            )
+        
+        # Validate each origin is a string
+        for origin in v:
+            if not isinstance(origin, str):
+                raise ValueError(f"CORS_ORIGINS must contain only strings, got {type(origin)}")
+            if not origin.startswith(("http://", "https://")):
+                raise ValueError(f"CORS origin must start with http:// or https://, got: {origin}")
+        
+        return v
 
     # =====================================================
     # LOGGING
     # =====================================================
     LOG_LEVEL: str = Field(default="INFO")
-    LOG_FORMAT: str = Field(default="json")
+    LOG_FORMAT: str = Field(
+        default="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",
+        description="Loguru format string. Must be simple to prevent recursion errors. "
+                   "Do NOT use nested braces like {{time}} or color tags like {red}."
+    )
+    LOG_FORMAT_TYPE: str = Field(default="text", description="Format type: 'text' or 'json'")
     LOG_DIR: str = Field(default="logs")
     LOG_ROTATION: str = Field(default="100 MB")
     LOG_RETENTION: str = Field(default="30 days")
@@ -361,60 +429,153 @@ class Settings(BaseSettings):
     ELK_INDEX_PREFIX: str = Field(default="logs-eli-maor")
 
     # =====================================================
+    # SENTRY (Error Tracking)
+    # =====================================================
+    SENTRY_DSN: str = Field(
+        default="",
+        description="Sentry DSN for error tracking (optional but recommended for production)"
+    )
+    SENTRY_ENVIRONMENT: str = Field(
+        default="production",
+        description="Sentry environment name (production, staging, development)"
+    )
+    SENTRY_TRACES_SAMPLE_RATE: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="Sentry traces sample rate (0.0 to 1.0)"
+    )
+
+    # =====================================================
     # VALIDATORS
     # =====================================================
+
+    @model_validator(mode="after")
+    def sync_environment_from_env(self):
+        """Sync ENVIRONMENT from ENV if ENV is set (ENV takes precedence)"""
+        if self.ENV and self.ENV != self.ENVIRONMENT:
+            self.ENVIRONMENT = self.ENV
+        return self
+
+    @model_validator(mode="after")
+    def merge_local_dev_cors_origins(self):
+        """
+        In local development, always allow common Vite / CRA localhost origins.
+
+        CORS_ORIGINS is often overridden via .env as a JSON list; a partial list
+        (e.g. missing :5178) breaks browser preflight with no ACAO header.
+        Production/staging: unchanged — only explicit CORS_ORIGINS apply.
+        """
+        env = (self.ENVIRONMENT or self.ENV or "development").lower()
+        if env not in ("development", "dev", "local"):
+            return self
+
+        local_dev_origins = [
+            "http://localhost:5178",
+            "http://127.0.0.1:5178",
+            "http://localhost:5179",
+            "http://127.0.0.1:5179",
+            "http://localhost:5181",
+            "http://127.0.0.1:5181",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ]
+        seen: set[str] = set()
+        merged: List[str] = []
+        for origin in [*self.CORS_ORIGINS, *local_dev_origins]:
+            if origin not in seen:
+                seen.add(origin)
+                merged.append(origin)
+        self.CORS_ORIGINS = merged
+        return self
 
     @field_validator("SECRET_KEY")
     @classmethod
     def validate_secret_key(cls, v: str, info) -> str:
-        """Validate SECRET_KEY is set and secure"""
-        # Allow empty in development mode
-        debug = os.getenv("DEBUG", "false").lower() == "true"
-
-        if not v and not debug:
-            # Try Docker secret
+        """
+        Validate SECRET_KEY is set and secure.
+        
+        Production: MUST be set and at least 32 characters.
+        Development: Falls back to dev-secret-key if not set.
+        """
+        # Get environment from info.data (Pydantic context)
+        # ENV takes precedence, fallback to ENVIRONMENT, default to development
+        env = info.data.get("ENV") or info.data.get("ENVIRONMENT", "development")
+        is_production = env.lower() == "production"
+        
+        # Try Docker secret if not set or using dev default
+        if not v or v == "dev-secret-key":
             docker_secret = Path("/run/secrets/secret_key")
             if docker_secret.exists():
-                return docker_secret.read_text().strip()
-            raise ValueError(
-                "SECRET_KEY must be set in production! "
-                "Use environment variable, Docker secret, or AWS Secrets Manager."
-            )
-
-        if v and len(v) < 32 and not debug:
-            raise ValueError("SECRET_KEY must be at least 32 characters in production")
-
-        # Return a dev key for development
-        if not v and debug:
-            return "dev-secret-key-not-for-production-use-only"
-
+                v = docker_secret.read_text().strip()
+        
+        # Production: MUST be set (not dev default), fail fast
+        if is_production:
+            if not v or v == "dev-secret-key":
+                raise ValueError(
+                    "SECRET_KEY must be set in production! "
+                    "Use environment variable, Docker secret, or AWS Secrets Manager. "
+                    "Cannot use dev-secret-key in production."
+                )
+            if len(v) < 32:
+                raise ValueError("SECRET_KEY must be at least 32 characters in production")
+            return v
+        
+        # Development: allow dev default
+        if not v or v == "dev-secret-key":
+            return "dev-secret-key"
+        
         return v
 
     @field_validator("DATABASE_URL")
     @classmethod
     def validate_database_url(cls, v: str, info) -> str:
-        """Validate DATABASE_URL is set"""
-        debug = os.getenv("DEBUG", "false").lower() == "true"
-
-        if not v:
-            # Try Docker secret
+        """
+        Validate DATABASE_URL is set.
+        
+        Production: MUST be set and cannot be SQLite.
+        Development: Falls back to sqlite:///./dev.db if not set.
+        """
+        # Get environment from info.data (Pydantic context)
+        # ENV takes precedence, fallback to ENVIRONMENT, default to development
+        env = info.data.get("ENV") or info.data.get("ENVIRONMENT", "development")
+        is_production = env.lower() == "production"
+        
+        # Try Docker secret if not set or using dev default
+        if not v or v == "sqlite:///./dev.db":
             docker_secret = Path("/run/secrets/database_url")
             if docker_secret.exists():
-                return docker_secret.read_text().strip()
-
-            # Use SQLite for development
-            if debug:
-                return "sqlite:///./eli_maor_dev.db"
-
-            raise ValueError(
-                "DATABASE_URL must be set in production! "
-                "Use environment variable, Docker secret, or AWS Secrets Manager."
-            )
-
+                v = docker_secret.read_text().strip()
+        
+        # Production: MUST be set (not dev default), fail fast
+        if is_production:
+            if not v or v == "sqlite:///./dev.db":
+                raise ValueError(
+                    "DATABASE_URL must be set in production! "
+                    "Use environment variable, Docker secret, or AWS Secrets Manager. "
+                    "Cannot use sqlite:///./dev.db in production."
+                )
+            if "sqlite" in v.lower():
+                raise ValueError(
+                    "DATABASE_URL cannot use SQLite in production! "
+                    "Use PostgreSQL or another production database."
+                )
+            return v
+        
+        # Development: allow SQLite default
+        if not v or v == "sqlite:///./dev.db":
+            return "sqlite:///./dev.db"
+        
         return v
 
     class Config:
-        env_file = ".env"
+        # Look for .env file in the backend directory (where this file is located)
+        # Convert Path to string for pydantic-settings compatibility
+        # IMPORTANT: Use absolute path to ensure .env file is found regardless of working directory
+        env_file_path = Path(__file__).parent.parent / ".env"
+        env_file = str(env_file_path.absolute())
         env_file_encoding = "utf-8"
         case_sensitive = True
         extra = "ignore"
@@ -425,12 +586,89 @@ def get_settings() -> Settings:
     Get application settings.
     Use this function instead of accessing settings directly
     to allow for easier testing and mocking.
+    
+    Raises:
+        ValueError: If SECRET_KEY or DATABASE_URL are not set (in production)
     """
-    return Settings()
+    # Debug: Check .env file before creating Settings
+    env_file_path = Path(__file__).parent.parent / ".env"
+    print(f"[CONFIG] 🔍 Loading settings...")
+    print(f"[CONFIG]    .env file path: {env_file_path.absolute()}")
+    print(f"[CONFIG]    .env file exists: {env_file_path.exists()}")
+    if env_file_path.exists():
+        try:
+            env_content = env_file_path.read_text(encoding='utf-8')
+            has_secret_key = 'SECRET_KEY=' in env_content
+            has_database_url = 'DATABASE_URL=' in env_content
+            env_value = None
+            for line in env_content.splitlines():
+                if line.strip().startswith('ENV=') or line.strip().startswith('ENVIRONMENT='):
+                    env_value = line.split('=', 1)[1].strip()
+                    break
+            print(f"[CONFIG]    Environment: {env_value or 'not set (defaults to development)'}")
+            print(f"[CONFIG]    .env contains SECRET_KEY: {has_secret_key}")
+            print(f"[CONFIG]    .env contains DATABASE_URL: {has_database_url}")
+            if has_secret_key:
+                # Extract SECRET_KEY value (first line that starts with SECRET_KEY=)
+                for line in env_content.splitlines():
+                    if line.strip().startswith('SECRET_KEY='):
+                        key_value = line.split('=', 1)[1].strip()
+                        print(f"[CONFIG]    SECRET_KEY value (first 20 chars): {key_value[:20]}...")
+                        break
+        except Exception as e:
+            print(f"[CONFIG]    ⚠️  Error reading .env file: {e}")
+    else:
+        print(f"[CONFIG]    ⚠️  WARNING: .env file not found!")
+        print(f"[CONFIG]    Current working directory: {Path.cwd()}")
+        print(f"[CONFIG]    Config file location: {Path(__file__).parent}")
+    
+    settings_instance = Settings()
+    
+    # Get environment (ENV takes precedence over ENVIRONMENT)
+    env = settings_instance.ENV or settings_instance.ENVIRONMENT
+    is_production = env.lower() == "production"
+    
+    # CRITICAL: In production, SECRET_KEY and DATABASE_URL MUST be set
+    # Validation happens in field_validator, but we add a final check here for clarity
+    if is_production:
+        if not settings_instance.SECRET_KEY or settings_instance.SECRET_KEY == "dev-secret-key":
+            error_msg = (
+                "SECRET_KEY is missing or using dev default in production! "
+                "Please set SECRET_KEY in your .env file or environment variable. "
+                "Example: SECRET_KEY=<strong-random-32-chars-minimum>"
+            )
+            print(f"[CONFIG] ❌ ERROR: {error_msg}")
+            raise ValueError(error_msg)
+        
+        if not settings_instance.DATABASE_URL or settings_instance.DATABASE_URL == "sqlite:///./dev.db" or "sqlite" in settings_instance.DATABASE_URL.lower():
+            error_msg = (
+                "DATABASE_URL is missing or using SQLite in production! "
+                "Please set DATABASE_URL to a production database (PostgreSQL). "
+                "Example: DATABASE_URL=postgresql+psycopg://user:pass@db:5432/app"
+            )
+            print(f"[CONFIG] ❌ ERROR: {error_msg}")
+            raise ValueError(error_msg)
+    
+    # Log successful configuration (without exposing secrets)
+    print(f"[CONFIG] ✅ Configuration loaded successfully")
+    print(f"[CONFIG]   Environment: {env} ({'PRODUCTION' if is_production else 'DEVELOPMENT'})")
+    print(f"[CONFIG]   SECRET_KEY: {'SET' if settings_instance.SECRET_KEY else 'NOT SET'} ({len(settings_instance.SECRET_KEY)} chars)")
+    print(f"[CONFIG]   DATABASE_URL: {'SET' if settings_instance.DATABASE_URL else 'NOT SET'} ({settings_instance.DATABASE_URL[:30] + '...' if settings_instance.DATABASE_URL else 'N/A'})")
+    print(f"[CONFIG]   DEBUG: {settings_instance.DEBUG}")
+    print(f"[CONFIG]   ACCESS_TOKEN_EXPIRE_MINUTES: {settings_instance.ACCESS_TOKEN_EXPIRE_MINUTES}")
+    
+    return settings_instance
 
 
 # Create global settings instance
-settings = get_settings()
+# This will raise ValueError if SECRET_KEY or DATABASE_URL are missing
+try:
+    settings = get_settings()
+except ValueError as e:
+    # Log the error and re-raise
+    import sys
+    print(f"[CONFIG] ❌ Failed to load settings: {e}", file=sys.stderr)
+    raise
 
 
 # Add property to Settings class for decrypted VAPID key

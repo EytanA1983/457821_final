@@ -1,0 +1,104 @@
+.authWrap {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 28px 16px;
+}
+
+.authCard {
+  width: min(460px, 100%);
+  border-radius: 28px;
+  padding: 34px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+}
+
+.authHeader {
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.authHeader h1 {
+  font-size: 34px;
+  line-height: 1.08;
+}
+
+.authHeader p {
+  margin: 10px 0 0;
+  color: var(--muted);
+}
+
+.authForm {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.authActions {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.authActions .btn {
+  width: 100%;
+}
+
+.authActions .wow-btn {
+  width: 100%;
+}
+
+.authFooter {
+  text-align: center;
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.authFooter a {
+  color: #4A2BC7;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .authWrap {
+    padding: 18px 12px;
+  }
+
+  .authCard {
+    border-radius: 22px;
+    padding: 24px 18px;
+  }
+
+  .authHeader h1 {
+    font-size: 30px;
+  }
+
+  .authHeader p {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+}
+
+@media (max-width: 380px) {
+  .authCard {
+    padding: 20px 14px;
+  }
+
+  .authHeader h1 {
+    font-size: 27px;
+  }
+
+  .authForm {
+    gap: 12px;
+  }
+
+  .authActions {
+    gap: 8px;
+  }
+
+  .authFooter {
+    font-size: 13px;
+  }
+}

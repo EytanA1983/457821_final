@@ -126,6 +126,41 @@ def get_recurring_templates(
     return templates
 
 
+@router.get("/templates/weekly", response_model=List[TaskRead])
+def get_weekly_recurring_templates(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    קבל את כל תבניות המשימות החוזרות השבועיות של המשתמש.
+    
+    משימות שבועיות מוגדרות כ:
+    - recurrence = "weekly", OR
+    - rrule_string מכיל FREQ=WEEKLY
+    
+    משמש ל-"משימות השבוע" widget בפרונט.
+    """
+    from app.schemas.task import TaskRead
+    from app.db.models.task import Recurrence
+    from sqlalchemy import or_
+    
+    templates = (
+        db.query(Task)
+        .filter(
+            Task.user_id == current_user.id,
+            Task.is_recurring_template == True,
+            or_(
+                Task.recurrence == Recurrence.weekly,
+                Task.rrule_string.ilike("%FREQ=WEEKLY%")
+            )
+        )
+        .order_by(Task.created_at.desc())
+        .all()
+    )
+    
+    return templates
+
+
 @router.get("/templates/{template_id}/instances")
 def get_template_instances(
     template_id: int,

@@ -1,0 +1,91 @@
+/* ====== Base components (SaaS feel) ====== */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.card.pad-md { padding: var(--space-md); }
+.card.pad-lg { padding: var(--space-lg); }
+
+.section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.section-title {
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.2px;
+}
+
+.section-subtitle {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.btn {
+  border-radius: 999px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-strong);
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.btn:hover {
+  border-color: rgba(0,0,0,0.2);
+  background: rgba(0,0,0,0.02);
+  transform: translateY(-1px);
+}
+
+.btn:active { transform: translateY(0px); }
+
+.btn-primary {
+  background: var(--color-primary);
+  border-color: transparent;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: rgba(79,70,229,0.9);
+}
+
+.btn-ghost {
+  background: transparent;
+}
+
+.pill-group {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.pill {
+  border-radius: 999px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-strong);
+  background: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.pill.active {
+  background: var(--color-primary-soft);
+  border-color: rgba(79,70,229,0.25);
+}
+
+/* ====== Density (Compact / Regular) ======
+   Toggle by adding class on body: density-compact
+*/
+body.density-compact .card.pad-md { padding: 12px; }
+body.density-compact .btn { padding: 7px 10px; font-size: 12.5px; }
+body.density-compact .pill { padding: 7px 10px; font-size: 12.5px; }
+body.density-compact .section-title { font-size: 15px; }

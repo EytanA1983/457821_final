@@ -402,5 +402,21 @@
     "read_less": "קרא פחות",
     "accept": "אני מסכים",
     "decline": "דחה"
+  },
+  "shopping": {
+    "title": "רשימות קניות",
+    "new_list": "רשימה חדשה",
+    "list_name": "שם הרשימה",
+    "description": "תיאור",
+    "items": "פריטים",
+    "add_item": "הוסף פריט",
+    "item_name": "שם הפריט",
+    "quantity": "כמות",
+    "category": "קטגוריה",
+    "notes": "הערות",
+    "template": "תבנית",
+    "active": "פעיל",
+    "completed": "הושלם",
+    "progress": "התקדמות"
   }
 }

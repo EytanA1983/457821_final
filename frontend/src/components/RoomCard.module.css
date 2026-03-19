@@ -157,3 +157,41 @@
     background-position: -200% 0;
   }
 }
+
+.cover{
+  height: 120px;
+  border-radius: 18px;
+  background:
+    radial-gradient(700px 220px at 18% 0%, rgba(160,124,254,.28), transparent 55%),
+    radial-gradient(560px 220px at 90% 20%, rgba(230,182,85,.16), transparent 60%),
+    #fff;
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+
+.card{
+  border-radius: 26px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: 0 14px 44px rgba(0,0,0,.06);
+  padding: 16px;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.card:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 24px 70px rgba(0,0,0,.10);
+  border-color: rgba(160,124,254,.25);
+}
+
+.title{
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.subtitle{
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}

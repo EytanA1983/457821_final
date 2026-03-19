@@ -1,25 +1,67 @@
 /**
  * Toast utility functions
- * Centralized toast notifications with i18n support
+ * Centralized toast notifications with consistent styling and behavior
  */
 import toast from 'react-hot-toast';
 import { TFunction } from 'i18next';
 
+// Consistent toast options
+const DEFAULT_TOAST_OPTIONS = {
+  duration: 4000,
+  position: 'top-center' as const,
+  style: {
+    borderRadius: '8px',
+    padding: '12px 16px',
+    fontSize: '14px',
+    maxWidth: '400px',
+  },
+};
+
 /**
- * Show success toast
+ * Show success toast with consistent styling
  */
 export const showSuccess = (message: string, t?: TFunction) => {
   toast.success(t ? t(message) : message, {
+    ...DEFAULT_TOAST_OPTIONS,
     icon: '✅',
+    style: {
+      ...DEFAULT_TOAST_OPTIONS.style,
+      background: '#10b981',
+      color: '#fff',
+    },
   });
 };
 
 /**
- * Show error toast
+ * Show error toast with consistent styling
+ * Accepts string, Error object, or API error response
  */
-export const showError = (message: string, t?: TFunction) => {
-  toast.error(t ? t(message) : message, {
+export const showError = (error: string | Error | any, t?: TFunction) => {
+  // Extract error message from various formats
+  let errorMessage = 'שגיאה לא ידועה';
+  
+  if (typeof error === 'string') {
+    errorMessage = error;
+  } else if (error instanceof Error) {
+    errorMessage = error.message;
+  } else if (error?.response?.data) {
+    // FastAPI error format
+    errorMessage = error.response.data.detail || error.response.data.message || error.message || errorMessage;
+  } else if (error?.message) {
+    errorMessage = error.message;
+  } else if (error?.detail) {
+    errorMessage = error.detail;
+  }
+  
+  toast.error(t ? t(errorMessage) : errorMessage, {
+    ...DEFAULT_TOAST_OPTIONS,
+    duration: 5000, // Errors stay longer
     icon: '❌',
+    style: {
+      ...DEFAULT_TOAST_OPTIONS.style,
+      background: '#ef4444',
+      color: '#fff',
+    },
   });
 };
 

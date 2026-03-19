@@ -1,0 +1,3 @@
+# Apache configuration for manifest.webmanifest MIME type
+# This ensures the file is served with the correct Content-Type header
+AddType application/manifest+json .webmanifest

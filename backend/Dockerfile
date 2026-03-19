@@ -16,21 +16,10 @@
 # ==================== Stage 1: Builder ====================
 FROM python:3.12-slim AS builder
 
-# Build arguments
-ARG POETRY_VERSION=1.7.1
-
 # Set environment variables
-# Note: Remove PIP_NO_CACHE_DIR to enable cache mounts
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    POETRY_NO_INTERACTION=1 \
-    POETRY_VIRTUALENVS_CREATE=false \
-    POETRY_HOME="/opt/poetry" \
-    POETRY_CACHE_DIR="/root/.cache/pypoetry"
-
-# Add Poetry to PATH
-ENV PATH="$POETRY_HOME/bin:$PATH"
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Install build dependencies with apt cache mount
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -41,20 +30,15 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     libpq-dev \
     curl
 
-# Install Poetry with cache mount
-RUN --mount=type=cache,target=/root/.cache/pip \
-    curl -sSL https://install.python-poetry.org | python3 - --version ${POETRY_VERSION}
-
 WORKDIR /app
 
 # Copy dependency files first (better layer caching)
-COPY pyproject.toml poetry.lock ./
+COPY requirements.txt ./
 
-# Install dependencies with pip and poetry cache mounts
+# Install dependencies with pip cache mount
 # This dramatically speeds up rebuilds when dependencies haven't changed
 RUN --mount=type=cache,target=/root/.cache/pip \
-    --mount=type=cache,target=/root/.cache/pypoetry \
-    poetry install --no-root --only main --no-ansi
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY app ./app

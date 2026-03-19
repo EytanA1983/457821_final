@@ -22,7 +22,7 @@ passlib = {extras = ["bcrypt"], version = "^1.7.4"}
 fastapi-users = {extras = ["sqlalchemy", "oauth"], version = "^12.1.2"}
 python-multipart = "^0.0.7"
 email-validator = ">=1.1.0,<2.1"
-redis = "^5.0.1"
+redis = "^4.5.0"  # Compatible with fastapi-cache2
 fastapi-cache2 = {extras = ["redis"], version = "^0.2.1"}
 hiredis = "^2.2.3"
 slowapi = "^0.1.9"  # Rate limiting for FastAPI (Flask-Limiter port)
@@ -40,7 +40,7 @@ python-dateutil = "^2.9.0.post0"     # recurrence (RRULE)
 httpx-oauth = "^0.15.0"
 asyncpg = "^0.29.0"
 aiosqlite = "^0.19.0"
-loguru = "^0.7.2"  # Advanced logging with rotation, JSON, ELK/Loki support
+loguru = "^0.7.3"  # Advanced logging with rotation, JSON, ELK/Loki support (0.7.x fixes recursion issues)
 sqlalchemy-utils = "^0.41.1"  # Utilities for SQLAlchemy (optional, using custom audit trail)
 prometheus-fastapi-instrumentator = "^7.0.0"  # Prometheus metrics for FastAPI
 strawberry-graphql = {extras = ["fastapi"], version = "^0.220.0"}  # GraphQL API

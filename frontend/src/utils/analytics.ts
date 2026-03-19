@@ -1,92 +1,110 @@
 /**
- * Analytics utilities for tracking user activity
- * Supports Google Analytics and Plausible (privacy-friendly)
+ * Basic Analytics Utility
+ * 
+ * Optional analytics tracking for user actions and page views.
+ * Can be extended to integrate with Google Analytics, Mixpanel, etc.
  */
 
-declare global {
-  interface Window {
-    gtag?: (...args: any[]) => void;
-    dataLayer?: any[];
-    plausible?: (eventName: string, options?: { props?: Record<string, any> }) => void;
-  }
-}
-
-/**
- * Initialize Google Analytics
- * @param measurementId - Google Analytics Measurement ID (e.g., G-XXXXXXXXXX)
- */
-export const initGA = (measurementId: string) => {
-  if (typeof window === 'undefined' || window.gtag) {
-    return;
-  }
-
-  const script = document.createElement('script');
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
-  script.async = true;
-  document.head.appendChild(script);
-
-  window.dataLayer = window.dataLayer || [];
-  function gtag(...args: any[]) {
-    window.dataLayer!.push(args);
-  }
-  window.gtag = gtag;
-  gtag('js', new Date());
-  gtag('config', measurementId, {
-    anonymize_ip: true, // שמירה על פרטיות
-    respect_dnt: true,   // כיבוד Do Not Track
-  });
+type AnalyticsEvent = {
+  name: string;
+  properties?: Record<string, any>;
 };
 
 /**
- * Track an event in Google Analytics
- * @param action - Event action (e.g., 'click', 'submit')
- * @param category - Event category (e.g., 'button', 'form')
- * @param label - Optional event label
+ * Track a custom event
  */
-export const trackGAEvent = (action: string, category: string, label?: string) => {
-  if (window.gtag) {
-    window.gtag('event', action, {
-      event_category: category,
-      event_label: label,
-    });
+export const trackEvent = (eventName: string, properties?: Record<string, any>) => {
+  // Only track in production or if explicitly enabled
+  if (import.meta.env.PROD || import.meta.env.VITE_ENABLE_ANALYTICS === 'true') {
+    try {
+      const event: AnalyticsEvent = {
+        name: eventName,
+        properties: properties || {},
+      };
+
+      // Log to console in development
+      if (import.meta.env.DEV) {
+        console.log('[Analytics]', event);
+      }
+
+      // TODO: Integrate with analytics service
+      // Example: Google Analytics
+      // if (typeof window !== 'undefined' && (window as any).gtag) {
+      //   (window as any).gtag('event', eventName, properties);
+      // }
+
+      // Example: Custom analytics endpoint
+      // fetch('/api/analytics', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify(event),
+      // });
+    } catch (error) {
+      console.error('[Analytics] Error tracking event:', error);
+    }
   }
 };
 
 /**
- * Track a page view in Plausible
- * @param url - URL of the page
+ * Track page view
  */
-export const trackPlausiblePageView = (url: string) => {
-  if (window.plausible) {
-    window.plausible('pageview', { props: { url } });
-  }
+export const trackPageView = (path: string) => {
+  trackEvent('page_view', { path });
 };
 
 /**
- * Track an event in Plausible
- * @param eventName - Name of the event
- * @param props - Optional event properties
+ * Track user action
  */
-export const trackPlausibleEvent = (eventName: string, props?: Record<string, any>) => {
-  if (window.plausible) {
-    window.plausible(eventName, { props });
-  }
+export const trackAction = (action: string, details?: Record<string, any>) => {
+  trackEvent('user_action', { action, ...details });
 };
 
 /**
- * Universal event tracking (works with both GA and Plausible)
- * @param eventName - Name of the event
- * @param category - Event category
- * @param props - Optional event properties
+ * Common event tracking functions
  */
-export const trackEvent = (eventName: string, category?: string, props?: Record<string, any>) => {
-  // Track in Google Analytics if available
-  if (window.gtag && category) {
-    trackGAEvent(eventName, category, props?.label);
-  }
+export const analytics = {
+  // Task events
+  taskCreated: (taskId: number, roomId?: number) => {
+    trackEvent('task_created', { taskId, roomId });
+  },
+  taskCompleted: (taskId: number) => {
+    trackEvent('task_completed', { taskId });
+  },
+  taskDeleted: (taskId: number) => {
+    trackEvent('task_deleted', { taskId });
+  },
 
-  // Track in Plausible if available
-  if (window.plausible) {
-    trackPlausibleEvent(eventName, { category, ...props });
-  }
+  // Room events
+  roomCreated: (roomId: number, roomName: string) => {
+    trackEvent('room_created', { roomId, roomName });
+  },
+  roomViewed: (roomId: number) => {
+    trackEvent('room_viewed', { roomId });
+  },
+
+  // Calendar events
+  calendarEventCreated: (eventId: string) => {
+    trackEvent('calendar_event_created', { eventId });
+  },
+  taskFromEventCreated: (eventId: string, taskId: number) => {
+    trackEvent('task_from_event_created', { eventId, taskId });
+  },
+
+  // Shopping list events
+  shoppingListCreated: (listId: number) => {
+    trackEvent('shopping_list_created', { listId });
+  },
+  shoppingItemAdded: (listId: number, itemId: number) => {
+    trackEvent('shopping_item_added', { listId, itemId });
+  },
+
+  // Auth events
+  userLoggedIn: (userId: number) => {
+    trackEvent('user_logged_in', { userId });
+  },
+  userRegistered: (userId: number) => {
+    trackEvent('user_registered', { userId });
+  },
 };
+
+export default analytics;

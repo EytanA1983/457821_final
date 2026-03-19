@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Optional, List
 import enum
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Enum
 from sqlalchemy.orm import relationship, Mapped, mapped_column
+from sqlalchemy.sql import func
 from app.db.base import Base
 
 if TYPE_CHECKING:
@@ -39,6 +40,15 @@ class Task(Base):
         nullable=True, 
         index=True
     )
+    assignee_user_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True,
+        index=True,
+    )
+    assignee_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    assignee_age: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    is_kid_task: Mapped[bool] = mapped_column(Boolean, default=False)
     room_id: Mapped[Optional[int]] = mapped_column(
         Integer, 
         ForeignKey("rooms.id"), 
@@ -81,14 +91,21 @@ class Task(Base):
 
     # History
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, 
-        default=datetime.utcnow, 
+        DateTime(timezone=True), 
+        server_default=func.now(),
+        nullable=False,
         index=True
     )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    before_image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    after_image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    before_image_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    after_image_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, 
-        default=datetime.utcnow, 
-        onupdate=datetime.utcnow
+        DateTime(timezone=True), 
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False
     )
 
     # Relationships
@@ -97,7 +114,15 @@ class Task(Base):
         back_populates="tasks"
     )
     room: Mapped[Optional["Room"]] = relationship("Room", back_populates="tasks")
-    user: Mapped["User"] = relationship("User", backref="tasks")
+    user: Mapped["User"] = relationship(
+        "User",
+        foreign_keys=[user_id],
+        backref="tasks",
+    )
+    assignee: Mapped[Optional["User"]] = relationship(
+        "User",
+        foreign_keys=[assignee_user_id],
+    )
     todos: Mapped[List["Todo"]] = relationship(
         "Todo", 
         back_populates="task", 
