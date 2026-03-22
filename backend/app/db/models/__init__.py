@@ -31,6 +31,7 @@ from app.db.models.daily_focus import DailyFocus
 
 # Vision board
 from app.db.models.vision_board import VisionBoard
+from app.db.models.vision_journal import VisionJournalEntry
 
 # Todo (sub-tasks)
 from app.db.models.todo import Todo
@@ -78,6 +79,7 @@ __all__ = [
     "DailyFocus",
     # Vision board
     "VisionBoard",
+    "VisionJournalEntry",
     # Todo
     "Todo",
     # Notification

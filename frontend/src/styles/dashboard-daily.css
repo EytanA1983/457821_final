@@ -79,6 +79,13 @@
   filter: brightness(1.05);
 }
 
+.dashboard-daily-empty--minimal {
+  background: transparent;
+  border: none;
+  padding: 8px 0 4px;
+  text-align: start;
+}
+
 /* Week strip — lightweight “calendar row” (app tasks only; Google Calendar–style chrome) */
 .dashboard-week-strip {
   margin-top: 4px;
@@ -280,6 +287,104 @@
   overflow: hidden;
 }
 
+.dashboard-daily-task-card--completed {
+  opacity: 0.72;
+  background: #f4f4f5;
+}
+
+.dashboard-daily-task-card--completed .dashboard-daily-task-card__title {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: rgba(15, 23, 42, 0.45);
+  color: #64748b;
+}
+
+.dashboard-daily-task-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-top: 8px;
+}
+
+.dashboard-daily-task-card__action {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1a73e8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.dashboard-daily-task-card__action--danger {
+  color: #b91c1c;
+}
+
+.dashboard-daily-task-card__action:hover {
+  filter: brightness(1.05);
+}
+
+.dashboard-daily-add-row {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  display: flex;
+  justify-content: center;
+}
+
+.dashboard-daily-add-row--solo {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.dashboard-daily-add-row__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border: 2px solid #1a73e8;
+  background: #fff;
+  color: #1a73e8;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dashboard-daily-add-row__btn:hover {
+  background: #e8f0fe;
+}
+
+.dashboard-task-edit-label {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  text-align: start;
+  color: var(--wow-text, #0f172a);
+}
+
+.dashboard-task-edit-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  font-size: 1rem;
+  margin-bottom: 16px;
+}
+
+.dashboard-task-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .dashboard-daily-task-card__body {
   flex: 1;
   min-width: 0;
@@ -371,6 +476,16 @@
   width: 22px;
   height: 22px;
   opacity: 0.85;
+}
+
+.dashboard-daily-task-card__circle--done {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: #22c55e;
+  color: #15803d;
+}
+
+.dashboard-daily-task-card__circle--done .dashboard-daily-task-card__check-icon {
+  opacity: 1;
 }
 
 /* Exit animation + sparkles */

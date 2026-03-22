@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type { AxiosError } from "axios";
 import api from "../api";
+import { invalidateTasksAndProgressCaches } from "../api/dashboardBootstrap";
 import { TaskRead } from "../schemas/task";
 import { showSuccess, showError } from "../utils/toast";
 import { TaskSkeleton } from "../components/SkeletonLoader";
@@ -17,6 +18,7 @@ export const AllTasksPage = () => {
   const { t } = useTranslation("tasks");
   const dirAttr = isRtlLang(i18n.language) ? "rtl" : "ltr";
   const locale = intlLocaleForLang(i18n.language);
+  const queryClient = useQueryClient();
 
   const { data: tasks = [], isLoading, refetch } = useQuery<TaskRead[]>({
     queryKey: ["tasks", "all"],
@@ -29,6 +31,7 @@ export const AllTasksPage = () => {
   const handleCompleteTask = async (taskId: number) => {
     try {
       await api.patch(`/tasks/${taskId}`, { completed: true });
+      await invalidateTasksAndProgressCaches(queryClient);
       showSuccess(t("all_list_toast_done"));
       refetch();
     } catch (error) {
@@ -46,6 +49,7 @@ export const AllTasksPage = () => {
       await api.patch(`/tasks/${task.id}`, {
         ...(kind === "before" ? { before_image_url: value || null } : { after_image_url: value || null }),
       });
+      await invalidateTasksAndProgressCaches(queryClient);
       showSuccess(t("all_list_image_updated"));
       refetch();
     } catch (error) {

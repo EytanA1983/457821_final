@@ -7,7 +7,7 @@ from starlette.responses import Response
 from app.config import settings
 from app.db.base import Base
 from app.db.session import engine
-from app.api import auth, categories, rooms, tasks, todos, google_calendar, notifications, ws, audit, recurring_tasks, statistics, progress, sharing, email, ai, drag_drop, ml, health, csp_report, shopping, content, inventory, emotional_journal, daily_focus, dashboard, vision_board, blueprint_aliases
+from app.api import auth, categories, rooms, tasks, todos, google_calendar, notifications, ws, audit, recurring_tasks, statistics, progress, sharing, email, ai, drag_drop, ml, health, csp_report, shopping, content, inventory, emotional_journal, daily_focus, dashboard, vision_board, vision_journal, blueprint_aliases
 from app.api.routes import daily_reset
 from app.services.rate_limiter import rate_limiter
 from app.core.logging import setup_logging, logger, log_request
@@ -487,6 +487,7 @@ app.include_router(statistics.router, prefix="/api", tags=["statistics"])
 app.include_router(progress.router, prefix="/api", tags=["progress"])
 app.include_router(dashboard.router)
 app.include_router(vision_board.router)
+app.include_router(vision_journal.router)
 app.include_router(sharing.router, prefix="/api", tags=["sharing"])
 app.include_router(email.router, prefix="/api", tags=["email"])
 app.include_router(ai.router, prefix="/api", tags=["ai"])

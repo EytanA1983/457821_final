@@ -10,6 +10,7 @@ import {
   formatDashboardLongDateFromYmd,
   formatDashboardWeekdayShort,
   formatDashboardWeekdayShortFromYmd,
+  dateKeyAndLocalTimeToIsoUtc,
   formatLocalDateKey,
   parseDateKeyLocal,
 } from "../utils/dashboardWeekFormat";
@@ -44,10 +45,11 @@ import {
   DASHBOARD_QUERY_STALE_MS,
   fetchDashboardProgressWeek,
   fetchDashboardTasksFullList,
+  invalidateTasksAndProgressCaches,
 } from "../api/dashboardBootstrap";
 import { clearTokens, hasTokens } from '../utils/tokenStorage';
 import { ROUTES } from '../utils/routes';
-import { showSuccess } from "../utils/toast";
+import { showError, showSuccess } from "../utils/toast";
 import { smokeDebug } from "../utils/smokeDebug";
 import type { ProgressSummaryRead } from '../schemas/progress';
 import type { GoogleDashboardCalendarAnchor } from "../schemas/googleCalendarAnchor";
@@ -194,6 +196,7 @@ const demoTasksStorageKey = (userId: number) => `dashboard_demo_tasks_${userId}`
 
 export default function Dashboard() {
   const { t: td, i18n } = useTranslation("dashboard");
+  const { t: tCommon } = useTranslation("common");
   const { t: tRooms } = useTranslation("rooms");
   const { t: tPc } = useTranslation("productCategories");
   const dirAttr = isRtlLang(i18n.language) ? "rtl" : "ltr";
@@ -203,8 +206,10 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   /** 0 = Sunday … 6 = Saturday — drives which local tasks appear on the dashboard */
   const [selectedDayIndex, setSelectedDayIndex] = useState(() => new Date().getDay());
-  /** Task id string currently playing the completion exit animation */
-  const [exitingTaskId, setExitingTaskId] = useState<string | null>(null);
+  /** Dashboard task editor (real server tasks only). */
+  const [editModalTaskId, setEditModalTaskId] = useState<string | null>(null);
+  const [editModalTitle, setEditModalTitle] = useState("");
+  const [deleteConfirmTaskId, setDeleteConfirmTaskId] = useState<string | null>(null);
   type CelebrationKind = "daily" | "monthly" | "both" | null;
   const [celebrationKind, setCelebrationKind] = useState<CelebrationKind>(null);
 
@@ -225,6 +230,8 @@ export default function Dashboard() {
   const lastDashboardHydrationRef = useRef<{ userId: number; weekSig: string } | null>(null);
   /** Supersede stale async from Strict Mode / rapid re-auth so `loading` always clears. */
   const dashboardHydrationRunIdRef = useRef(0);
+  /** When true, task rows came from GET /tasks — "defer" updates `due_date` on the server. */
+  const tasksHydratedFromApiRef = useRef(false);
 
   /** Defer non-critical Google Calendar fetch so it does not compete with tasks + progress. */
   const [calendarQueryEnabled, setCalendarQueryEnabled] = useState(false);
@@ -292,14 +299,20 @@ export default function Dashboard() {
 
     const loadUser = async () => {
       setLoading(true);
-      sessionUserIdRef.current = null;
-      setSessionUserId(null);
-      setTasks([]);
-
+      /**
+       * Do NOT clear `sessionUserId` / `tasks` here when tokens exist.
+       * Clearing `sessionUserId` disables the progress + chart `useQuery` hooks for the whole
+       * bootstrap; combined with Strict Mode or a overlapping effect run, an aborted run can leave
+       * the UI empty until a later navigation (e.g. Categories → Dashboard) remounts cleanly.
+       * We only reset state when there is no session or when /me proves the session invalid.
+       */
       const stillCurrent = () => runId === dashboardHydrationRunIdRef.current;
 
       try {
         if (!hasTokens()) {
+          sessionUserIdRef.current = null;
+          setSessionUserId(null);
+          setTasks([]);
           smokeDebug("dashboard:no_tokens_redirect", {});
           navigate(ROUTES.LOGIN, { replace: true });
           return;
@@ -321,15 +334,34 @@ export default function Dashboard() {
           clearTokens();
           sessionUserIdRef.current = null;
           setSessionUserId(null);
+          setTasks([]);
           navigate(ROUTES.LOGIN, { replace: true });
           return;
         }
 
         sessionUserIdRef.current = uid;
+        /**
+         * Enable user-scoped React Query observers immediately so progress + chart slices stay
+         * subscribed while `invalidateTasksAndProgressCaches` + `fetchQuery` run (cache updates
+         * propagate to the pie and stats without waiting until local task hydration finishes).
+         */
+        setSessionUserId(uid);
 
         const storageKey = demoTasksStorageKey(uid);
         const initialWeekKeys = buildLocalSundayWeekDateKeys();
         const weekStartDateKey = initialWeekKeys[0] ?? formatLocalDateKey(new Date());
+
+        /**
+         * Always treat server task/progress caches as stale on dashboard bootstrap.
+         * Otherwise `fetchQuery` can return a list from before the latest create/update for up to
+         * `DASHBOARD_QUERY_STALE_MS` (user sees missing tasks until visiting another screen).
+         */
+        await invalidateTasksAndProgressCaches(queryClient);
+        if (!stillCurrent()) return;
+
+        if (import.meta.env.DEV) {
+          console.debug("[dashboard:bootstrap] invalidated tasks+progress, fetching…", { uid });
+        }
 
         /** Warm React Query cache before enabling user-scoped observers (avoids duplicate in-flight /tasks). */
         try {
@@ -354,19 +386,28 @@ export default function Dashboard() {
         const apiTasks =
           queryClient.getQueryData<TaskRead[]>(["tasks", "chartSlices", uid]) ?? null;
 
+        tasksHydratedFromApiRef.current = false;
+
         /** Prefer server tasks whenever GET /tasks succeeds (including empty list). */
         let hydratedFromApi = false;
         if (Array.isArray(apiTasks)) {
           hydratedFromApi = true;
+          tasksHydratedFromApiRef.current = true;
           if (apiTasks.length > 0) {
             const mapped = apiTasks.map(mapTaskReadToDashboardTask);
             const stripped = stripExpiredTaskDeferrals(mapped, weekStartDateKey);
             const localizedTasks = localizeDemoTaskTitles(stripped, i18n.language);
             setTasks(localizedTasks);
             localStorage.setItem(storageKey, JSON.stringify(localizedTasks));
+            if (import.meta.env.DEV) {
+              console.debug("[dashboard:bootstrap] hydrated from API", { count: localizedTasks.length });
+            }
           } else {
             setTasks([]);
             localStorage.setItem(storageKey, JSON.stringify([]));
+            if (import.meta.env.DEV) {
+              console.debug("[dashboard:bootstrap] API returned empty task list");
+            }
           }
         }
 
@@ -408,13 +449,13 @@ export default function Dashboard() {
         }
 
         if (!stillCurrent()) return;
-        setSessionUserId(uid);
         dashboardPerfDebug("sessionUserId + local tasks", perfStart);
       } catch (error) {
         console.error("[Dashboard] Error fetching user:", error);
         clearTokens();
         sessionUserIdRef.current = null;
         setSessionUserId(null);
+        setTasks([]);
         navigate(ROUTES.LOGIN, { replace: true });
       } finally {
         if (runId === dashboardHydrationRunIdRef.current) {
@@ -551,18 +592,37 @@ export default function Dashboard() {
         prevSlot?.monthly,
         DASHBOARD_MONTHLY_BUCKET_CAP,
       );
+
+      const keepCompleted = (ids: string[] | undefined, monthly: boolean): string[] => {
+        return (ids ?? []).filter((id) => {
+          if (isLibraryDashboardTaskId(id)) {
+            return Boolean(libSchedule.consumedLibIdsByDaySlot[daySlotKey]?.[id]);
+          }
+          const t = tasks.find((x) => String(x.id) === id);
+          if (!t?.completed) return false;
+          if (!taskScheduledOnDateKey(t, daySlotKey)) return false;
+          if (monthly) return t.frequency === "monthly";
+          return t.frequency === "daily" || t.frequency === "weekly";
+        });
+      };
+
+      const doneDaily = keepCompleted(prevSlot?.daily, false);
+      const doneMonthly = keepCompleted(prevSlot?.monthly, true);
+      const mergedDaily = [...nextDaily, ...doneDaily.filter((id) => !nextDaily.includes(id))];
+      const mergedMonthly = [...nextMonthly, ...doneMonthly.filter((id) => !nextMonthly.includes(id))];
+
       if (
         prevSlot &&
-        prevSlot.daily.length === nextDaily.length &&
-        prevSlot.monthly.length === nextMonthly.length &&
-        prevSlot.daily.every((id, i) => id === nextDaily[i]) &&
-        prevSlot.monthly.every((id, i) => id === nextMonthly[i])
+        prevSlot.daily.length === mergedDaily.length &&
+        prevSlot.monthly.length === mergedMonthly.length &&
+        prevSlot.daily.every((id, i) => id === mergedDaily[i]) &&
+        prevSlot.monthly.every((id, i) => id === mergedMonthly[i])
       ) {
         return prev;
       }
-      return { ...prev, [daySlotKey]: { daily: nextDaily, monthly: nextMonthly } };
+      return { ...prev, [daySlotKey]: { daily: mergedDaily, monthly: mergedMonthly } };
     });
-  }, [dailyEligibleWithRefill, monthlyEligibleWithRefill, daySlotKey]);
+  }, [dailyEligibleWithRefill, monthlyEligibleWithRefill, daySlotKey, tasks, libSchedule]);
 
   const visibleIdsForSlot = useMemo((): DayBucketIds => {
     const fromState = visibleIdsByDay[daySlotKey];
@@ -641,8 +701,14 @@ export default function Dashboard() {
     for (const t of librarySyntheticTasks) {
       m.set(String(t.id), t);
     }
+    const consumed = libSchedule.consumedLibIdsByDaySlot[daySlotKey] ?? {};
+    for (const libId of Object.keys(consumed)) {
+      if (!consumed[libId]) continue;
+      const snap = libraryCompletedTaskSnapshot(libId, i18n.language);
+      if (snap) m.set(libId, snap);
+    }
     return m;
-  }, [tasks, librarySyntheticTasks]);
+  }, [tasks, librarySyntheticTasks, libSchedule, daySlotKey, i18n.language]);
 
   /** Real tasks + persisted library completions so the donut matches "המשימות שלי להיום". */
   const tasksForCategoryProgress = useMemo(() => {
@@ -664,13 +730,16 @@ export default function Dashboard() {
 
   const resolveVisibleBucket = useCallback(
     (ids: string[], allowed: (t: Task) => boolean): Task[] => {
-      return ids
-        .map((id) => taskById.get(id))
-        .filter((t): t is Task => {
-          if (!t || t.completed) return false;
-          if (!taskScheduledOnDateKey(t, daySlotKey)) return false;
-          return allowed(t);
-        });
+      const pending: Task[] = [];
+      const done: Task[] = [];
+      for (const id of ids) {
+        const t = taskById.get(id);
+        if (!t || !taskScheduledOnDateKey(t, daySlotKey)) continue;
+        if (!allowed(t)) continue;
+        if (t.completed) done.push(t);
+        else pending.push(t);
+      }
+      return [...pending, ...done];
     },
     [taskById, daySlotKey],
   );
@@ -798,7 +867,6 @@ export default function Dashboard() {
 
   const deferTaskToNextDay = useCallback(
     (taskIdStr: string) => {
-      if (exitingTaskId) return;
       const deferredKey = addDaysToDateKey(daySlotKey, 1);
       const nextDate = parseDateKeyLocal(deferredKey);
       const dayLabel = displayTimeZone
@@ -816,23 +884,157 @@ export default function Dashboard() {
         return;
       }
 
-      let applied = false;
-      setTasks((prev) => {
-        const task = prev.find((t) => String(t.id) === taskIdStr);
-        if (!task || task.completed) return prev;
-        applied = true;
-        const nextTasks = prev.map((t) =>
-          String(t.id) === taskIdStr ? { ...t, deferredUntilDateKey: deferredKey } : t
-        );
+      void (async () => {
         const tasksStorageKey =
           sessionUserIdRef.current != null ? demoTasksStorageKey(sessionUserIdRef.current) : "tasks";
-        localStorage.setItem(tasksStorageKey, JSON.stringify(nextTasks));
-        return nextTasks;
-      });
-      if (applied) showSuccess(td("taskDeferredToDay", { day: dayLabel }));
+
+        const snapshot = tasks;
+        const row = snapshot.find((t) => String(t.id) === taskIdStr);
+        if (!row || row.completed) return;
+
+        const optimistic = snapshot.map((t) =>
+          String(t.id) === taskIdStr ? { ...t, deferredUntilDateKey: deferredKey } : t
+        );
+        setTasks(optimistic);
+        localStorage.setItem(tasksStorageKey, JSON.stringify(optimistic));
+
+        const numericId = Number(taskIdStr);
+        const persistToServer =
+          tasksHydratedFromApiRef.current &&
+          Number.isInteger(numericId) &&
+          numericId > 0 &&
+          sessionUserId != null;
+
+        if (!persistToServer) {
+          showSuccess(td("taskDeferredToDay", { day: dayLabel }));
+          return;
+        }
+
+        const dueIso = dateKeyAndLocalTimeToIsoUtc(deferredKey, row.scheduledTime);
+        try {
+          const { data: updatedRead } = await api.put<TaskRead>(`/tasks/${numericId}`, { due_date: dueIso });
+          const mapped = mapTaskReadToDashboardTask(updatedRead);
+          const localized = localizeDemoTaskTitles([mapped], i18n.language)[0] ?? mapped;
+
+          setTasks((prev) => {
+            const next = prev.map((t) => (String(t.id) === taskIdStr ? localized : t));
+            localStorage.setItem(tasksStorageKey, JSON.stringify(next));
+            return next;
+          });
+
+          queryClient.setQueryData<TaskRead[]>(["tasks", "chartSlices", sessionUserId], (prev) => {
+            if (!prev) return prev;
+            return prev.map((r) => (Number(r.id) === numericId ? updatedRead : r));
+          });
+
+          await invalidateTasksAndProgressCaches(queryClient);
+          showSuccess(td("taskDeferredToDay", { day: dayLabel }));
+        } catch {
+          setTasks(() => {
+            localStorage.setItem(tasksStorageKey, JSON.stringify(snapshot));
+            return snapshot;
+          });
+          showError(td("taskDeferFailed"));
+        }
+      })();
     },
-    [exitingTaskId, daySlotKey, displayTimeZone, i18n.language, td, taskById],
+    [
+      daySlotKey,
+      displayTimeZone,
+      i18n.language,
+      queryClient,
+      sessionUserId,
+      showError,
+      showSuccess,
+      taskById,
+      tasks,
+      td,
+    ],
   );
+
+  const openEditTaskModal = useCallback((taskIdStr: string) => {
+    if (isLibraryDashboardTaskId(taskIdStr)) return;
+    const t = tasks.find((x) => String(x.id) === taskIdStr);
+    if (!t) return;
+    setEditModalTaskId(taskIdStr);
+    setEditModalTitle(t.title);
+  }, [tasks]);
+
+  const saveEditedTaskTitle = useCallback(async () => {
+    const idStr = editModalTaskId;
+    if (!idStr) return;
+    const trimmed = editModalTitle.trim();
+    if (!trimmed) {
+      showError(td("taskEditTitleRequired"));
+      return;
+    }
+    const numericId = Number(idStr);
+    if (!Number.isInteger(numericId) || numericId <= 0) {
+      setEditModalTaskId(null);
+      return;
+    }
+    const tasksStorageKey =
+      sessionUserIdRef.current != null ? demoTasksStorageKey(sessionUserIdRef.current) : "tasks";
+    const prev = tasks.find((t) => String(t.id) === idStr);
+    if (!prev) {
+      setEditModalTaskId(null);
+      return;
+    }
+    const nextTasks = tasks.map((t) => (String(t.id) === idStr ? { ...t, title: trimmed } : t));
+    setTasks(nextTasks);
+    localStorage.setItem(tasksStorageKey, JSON.stringify(nextTasks));
+    setEditModalTaskId(null);
+    try {
+      await api.patch(`/tasks/${numericId}`, { title: trimmed });
+      void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      showSuccess(td("taskEditSaved"));
+    } catch {
+      setTasks((cur) => {
+        const reverted = cur.map((t) => (String(t.id) === idStr ? prev : t));
+        localStorage.setItem(tasksStorageKey, JSON.stringify(reverted));
+        return reverted;
+      });
+      showError(td("taskEditSaveFailed"));
+    }
+  }, [editModalTaskId, editModalTitle, tasks, queryClient, td]);
+
+  const confirmDeleteTask = useCallback(async () => {
+    if (!deleteConfirmTaskId) return;
+    const taskIdStr = deleteConfirmTaskId;
+    const numericId = Number(taskIdStr);
+    if (!Number.isInteger(numericId) || numericId <= 0) {
+      setDeleteConfirmTaskId(null);
+      return;
+    }
+    const tasksStorageKey =
+      sessionUserIdRef.current != null ? demoTasksStorageKey(sessionUserIdRef.current) : "tasks";
+    const snapshot = tasks;
+    const nextTasks = tasks.filter((t) => String(t.id) !== taskIdStr);
+    setTasks(nextTasks);
+    localStorage.setItem(tasksStorageKey, JSON.stringify(nextTasks));
+    setDeleteConfirmTaskId(null);
+    setVisibleIdsByDay((prev) => {
+      const slot = prev[daySlotKey];
+      if (!slot) return prev;
+      return {
+        ...prev,
+        [daySlotKey]: {
+          daily: slot.daily.filter((id) => id !== taskIdStr),
+          monthly: slot.monthly.filter((id) => id !== taskIdStr),
+        },
+      };
+    });
+    try {
+      await api.delete(`/tasks/${numericId}`);
+      void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      void queryClient.invalidateQueries({ queryKey: ["progress"] });
+      showSuccess(td("taskDeletedToast"));
+    } catch {
+      setTasks(snapshot);
+      localStorage.setItem(tasksStorageKey, JSON.stringify(snapshot));
+      showError(td("taskDeleteFailed"));
+    }
+  }, [deleteConfirmTaskId, tasks, daySlotKey, queryClient, td]);
 
   const progressStatsPending = loading || progressLoading;
   const completedTasksCount =
@@ -849,8 +1051,24 @@ export default function Dashboard() {
   const showTaskAreaSkeleton = loading;
   const progressCardLoading = loading || progressLoading;
 
+  const canEditOrDeleteTask = useCallback((taskIdStr: string) => {
+    if (isLibraryDashboardTaskId(taskIdStr)) return false;
+    const n = Number(taskIdStr);
+    return Number.isInteger(n) && n > 0;
+  }, []);
+
   return (
     <div style={{ display: "grid", gap: 24 }} dir={dirAttr}>
+      <DashboardWeekBar
+        weekStart={weekStartSunday}
+        weekDateKeys={weekDateKeys}
+        displayTimeZone={displayTimeZone}
+        calendarTodayKey={calendarTodayKey}
+        selectedDayIndex={selectedDayIndex}
+        onSelectDay={setSelectedDayIndex}
+        tasks={tasks}
+      />
+
       <section className="daily-card dashboard-daily-section" aria-labelledby="dashboard-daily-tasks-heading">
         <h2 id="dashboard-daily-tasks-heading" className="dashboard-daily-section__title">
           {td("tasksForSelectedDayTitle")}
@@ -873,11 +1091,13 @@ export default function Dashboard() {
             </div>
           </div>
         ) : !hasAnyTasksForSelectedDay ? (
-          <div className="dashboard-daily-empty">
+          <div className="dashboard-daily-empty dashboard-daily-empty--minimal">
             <p className="dashboard-daily-empty__text">{td("allClearForDay")}</p>
-            <button type="button" className="dashboard-daily-empty__cta" onClick={() => navigate(ROUTES.ADD_TASK)}>
-              {td("addDailyMonthlyTaskCta")}
-            </button>
+            <div className="dashboard-daily-add-row dashboard-daily-add-row--solo">
+              <button type="button" className="dashboard-daily-add-row__btn" onClick={() => navigate(ROUTES.ADD_TASK)}>
+                {td("addTaskButtonOnly")}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="dashboard-daily-task-list">
@@ -891,23 +1111,14 @@ export default function Dashboard() {
                     key={task.id}
                     task={task}
                     categoryLabel={getDashboardTaskCategoryLabel(task.room, tPc, tRooms)}
-                    isExiting={exitingTaskId === String(task.id)}
                     onCompleteClick={() => {
-                      if (exitingTaskId) return;
-                      const reduceMotion =
-                        typeof window !== "undefined" &&
-                        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-                      if (reduceMotion) {
-                        void persistTaskComplete(String(task.id));
-                        return;
-                      }
-                      setExitingTaskId(String(task.id));
-                    }}
-                    onExitAnimationEnd={() => {
+                      if (task.completed) return;
                       void persistTaskComplete(String(task.id));
-                      setExitingTaskId((cur) => (cur === String(task.id) ? null : cur));
                     }}
                     onDeferToNextDay={() => deferTaskToNextDay(String(task.id))}
+                    showActions={canEditOrDeleteTask(String(task.id))}
+                    onEditClick={() => openEditTaskModal(String(task.id))}
+                    onDeleteClick={() => setDeleteConfirmTaskId(String(task.id))}
                   />
                 ))
               )}
@@ -923,42 +1134,28 @@ export default function Dashboard() {
                     key={task.id}
                     task={task}
                     categoryLabel={getDashboardTaskCategoryLabel(task.room, tPc, tRooms)}
-                    isExiting={exitingTaskId === String(task.id)}
                     onCompleteClick={() => {
-                      if (exitingTaskId) return;
-                      const reduceMotion =
-                        typeof window !== "undefined" &&
-                        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-                      if (reduceMotion) {
-                        void persistTaskComplete(String(task.id));
-                        return;
-                      }
-                      setExitingTaskId(String(task.id));
-                    }}
-                    onExitAnimationEnd={() => {
+                      if (task.completed) return;
                       void persistTaskComplete(String(task.id));
-                      setExitingTaskId((cur) => (cur === String(task.id) ? null : cur));
                     }}
                     onDeferToNextDay={() => deferTaskToNextDay(String(task.id))}
+                    showActions={canEditOrDeleteTask(String(task.id))}
+                    onEditClick={() => openEditTaskModal(String(task.id))}
+                    onDeleteClick={() => setDeleteConfirmTaskId(String(task.id))}
                   />
                 ))
               )}
             </div>
 
             <p className="dashboard-daily-task-list__defer-hint">{td("taskSwipeDeferHint")}</p>
+            <div className="dashboard-daily-add-row">
+              <button type="button" className="dashboard-daily-add-row__btn" onClick={() => navigate(ROUTES.ADD_TASK)}>
+                {td("addTaskButtonOnly")}
+              </button>
+            </div>
           </div>
         )}
       </section>
-
-      <DashboardWeekBar
-        weekStart={weekStartSunday}
-        weekDateKeys={weekDateKeys}
-        displayTimeZone={displayTimeZone}
-        calendarTodayKey={calendarTodayKey}
-        selectedDayIndex={selectedDayIndex}
-        onSelectDay={setSelectedDayIndex}
-        tasks={tasks}
-      />
 
       <DashboardCategoryProgress
         progressLoading={progressCardLoading}
@@ -989,6 +1186,51 @@ export default function Dashboard() {
           <div className="dashboard-celebration-actions">
             <button type="button" className="wow-btn wow-btnPrimary" onClick={() => setCelebrationKind(null)}>
               {td("progressCelebrateCta")}
+            </button>
+          </div>
+        </Modal>
+      ) : null}
+
+      {editModalTaskId ? (
+        <Modal
+          title={td("taskEditModalTitle")}
+          description={null}
+          onClose={() => setEditModalTaskId(null)}
+        >
+          <label className="dashboard-task-edit-label" htmlFor="dashboard-task-edit-title">
+            {td("taskEditFieldLabel")}
+          </label>
+          <input
+            id="dashboard-task-edit-title"
+            className="dashboard-task-edit-input"
+            type="text"
+            value={editModalTitle}
+            onChange={(e) => setEditModalTitle(e.target.value)}
+            autoFocus
+          />
+          <div className="dashboard-task-edit-actions">
+            <button type="button" className="wow-btn" onClick={() => setEditModalTaskId(null)}>
+              {tCommon("cancel")}
+            </button>
+            <button type="button" className="wow-btn wow-btnPrimary" onClick={() => void saveEditedTaskTitle()}>
+              {tCommon("save")}
+            </button>
+          </div>
+        </Modal>
+      ) : null}
+
+      {deleteConfirmTaskId ? (
+        <Modal
+          title={td("taskDeleteModalTitle")}
+          description={td("taskDeleteModalBody")}
+          onClose={() => setDeleteConfirmTaskId(null)}
+        >
+          <div className="dashboard-task-edit-actions">
+            <button type="button" className="wow-btn" onClick={() => setDeleteConfirmTaskId(null)}>
+              {tCommon("cancel")}
+            </button>
+            <button type="button" className="wow-btn wow-btnPrimary" onClick={() => void confirmDeleteTask()}>
+              {tCommon("delete")}
             </button>
           </div>
         </Modal>

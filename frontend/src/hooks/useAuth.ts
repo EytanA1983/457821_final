@@ -87,9 +87,9 @@ export const useAuth = () => {
     // Listen for custom event (same-tab)
     const handleTokenChange = () => {
       smokeDebug("useAuth:token_changed_event", {});
-      setTimeout(() => {
-        checkAuth();
-      }, 100);
+      // Same-tab login writes tokens synchronously; deferring caused Home/Dashboard to render
+      // with `user === null` briefly and skip task/progress queries until a later navigation.
+      void checkAuth();
     };
 
     window.addEventListener('storage', handleStorageChange);

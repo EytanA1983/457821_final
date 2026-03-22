@@ -29,7 +29,7 @@ export const ROUTES = {
   EMOTIONAL_JOURNAL: "/emotional-journal",
   CONTENT_HUB: "/content-hub",
   SETTINGS: "/settings",
-  /** לוח החזון — שבוע + שעות, משימות + Google Calendar */
+  /** לוח חזון — מחברת השראה מקומית (טקסט/תמונות); היומן ב-Google ב־CALENDAR */
   MY_VISION_BOARD: "/vision",
   CALENDAR: "/calendar",
   SHOPPING_LISTS: "/shopping",

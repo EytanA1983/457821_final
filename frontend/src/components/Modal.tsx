@@ -8,14 +8,19 @@ interface ModalProps {
   /** Subtitle under title. Omit = default copy; `null` = hide. */
   description?: string | null;
   isOpen?: boolean;
+  /**
+   * `timer` — no title/subtitle block, only close (e.g. focus timer: no default modal copy).
+   */
+  variant?: "default" | "timer";
 }
 
-export const Modal = ({ children, onClose, title, description, isOpen = true }: ModalProps) => {
+export const Modal = ({ children, onClose, title, description, isOpen = true, variant = "default" }: ModalProps) => {
   const { t } = useTranslation("common");
   const modalTitle = title ?? t("modal_default_title");
   const defaultSubtitle = t("modal_default_subtitle");
   const modalSubtitle = description === undefined ? defaultSubtitle : description;
   const closeLabel = t("close");
+  const isTimerVariant = variant === "timer";
 
   // Close on ESC key
   useEffect(() => {
@@ -39,24 +44,35 @@ export const Modal = ({ children, onClose, title, description, isOpen = true }: 
         onClick={(e) => e.stopPropagation()}
       >
         <div className="wowModalInner">
-          {/* Header with title and close button */}
-          <div className="wowModalHeader">
-            <div>
-              <h2 className="wowModalTitle">{modalTitle}</h2>
-              {modalSubtitle != null && modalSubtitle !== "" ? (
-                <p className="wow-muted" style={{ marginTop: 6, marginBottom: 0 }}>
-                  {modalSubtitle}
-                </p>
-              ) : null}
-            </div>
-            <button
-              onClick={onClose}
-              className="wowModalClose"
-              aria-label={closeLabel}
+          {isTimerVariant ? (
+            <div
+              className="wowModalHeader"
+              style={{
+                justifyContent: "flex-end",
+                borderBottom: "none",
+                paddingBottom: 4,
+                marginBottom: 0,
+              }}
             >
-              ×
-            </button>
-          </div>
+              <button type="button" onClick={onClose} className="wowModalClose" aria-label={closeLabel}>
+                ×
+              </button>
+            </div>
+          ) : (
+            <div className="wowModalHeader">
+              <div>
+                <h2 className="wowModalTitle">{modalTitle}</h2>
+                {modalSubtitle != null && modalSubtitle !== "" ? (
+                  <p className="wow-muted" style={{ marginTop: 6, marginBottom: 0 }}>
+                    {modalSubtitle}
+                  </p>
+                ) : null}
+              </div>
+              <button type="button" onClick={onClose} className="wowModalClose" aria-label={closeLabel}>
+                ×
+              </button>
+            </div>
+          )}
 
           {/* Content */}
           <div className="wowModalBody">{children}</div>

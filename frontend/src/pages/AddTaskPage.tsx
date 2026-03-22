@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import api from "../api";
+import { invalidateTasksAndProgressCaches } from "../api/dashboardBootstrap";
 import { showSuccess, showError } from "../utils/toast";
 import { ROUTES } from "../utils/routes";
 import { useTranslation } from "react-i18next";
@@ -35,6 +37,7 @@ export const AddTaskPage = () => {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const next = decodeTitleQuery(searchParams.get("title") ?? searchParams.get("suggestion"));
@@ -96,6 +99,10 @@ export const AddTaskPage = () => {
         assignee_name: assigneeName.trim() || null,
         assignee_age: assigneeAge ? Number(assigneeAge) : null,
       });
+      await invalidateTasksAndProgressCaches(queryClient);
+      if (import.meta.env.DEV) {
+        console.debug("[task:create] POST /tasks ok, invalidated tasks+progress caches", { roomId });
+      }
       showSuccess(tToast("task_created"));
       navigate(ROUTES.HOME);
     } catch (err: unknown) {

@@ -119,7 +119,6 @@ export default function DashboardWeekBar({
             </button>
           ))}
         </div>
-        <p className="dashboard-week-strip__hint">{td("weekStripHint")}</p>
       </div>
     </section>
   );

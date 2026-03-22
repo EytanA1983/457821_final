@@ -167,8 +167,9 @@ export default function Login() {
               queryFn: fetchDashboardProgressWeek,
               staleTime: DASHBOARD_QUERY_STALE_MS,
             }),
+            // Must match `useTasks(undefined)` → queryKey: ["tasks", undefined] so Home ("/") chart/tasks hydrate from cache.
             queryClient.prefetchQuery({
-              queryKey: ["tasks", "chartSlices", uid],
+              queryKey: ["tasks", undefined],
               queryFn: fetchDashboardTasksFullList,
               staleTime: DASHBOARD_QUERY_STALE_MS,
             }),

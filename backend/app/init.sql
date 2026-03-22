@@ -35,3 +35,17 @@ CREATE TABLE IF NOT EXISTS emotional_journal_entries (
 );
 CREATE INDEX IF NOT EXISTS ix_emotional_journal_entries_user_id ON emotional_journal_entries(user_id);
 CREATE INDEX IF NOT EXISTS ix_emotional_journal_entries_created_at ON emotional_journal_entries(created_at);
+
+-- Vision journal / inspiration board (align with Alembic 011 + ORM VisionJournalEntry)
+CREATE TABLE IF NOT EXISTS vision_journal_entries (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    entry_type VARCHAR(16) NOT NULL,
+    text_content TEXT,
+    image_url VARCHAR(2048),
+    caption VARCHAR(500),
+    position INTEGER,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS ix_vision_journal_entries_user_id ON vision_journal_entries(user_id);

@@ -38,6 +38,7 @@ export function mapTaskReadToDashboardTask(t: TaskRead): Task {
 
   let frequency: Task["frequency"] = "daily";
   let deferredUntilDateKey: string | undefined;
+  let monthlyDayOfMonth: number | undefined;
 
   if (recurrence === "daily") {
     frequency = "daily";
@@ -45,6 +46,13 @@ export function mapTaskReadToDashboardTask(t: TaskRead): Task {
     frequency = "weekly";
   } else if (recurrence === "monthly") {
     frequency = "monthly";
+    if (t.due_date) {
+      const md = new Date(t.due_date);
+      if (!Number.isNaN(md.getTime())) {
+        const dom = md.getDate();
+        if (dom >= 1 && dom <= 31) monthlyDayOfMonth = dom;
+      }
+    }
   } else if (t.due_date) {
     const d = new Date(t.due_date);
     if (!Number.isNaN(d.getTime())) {
@@ -55,7 +63,7 @@ export function mapTaskReadToDashboardTask(t: TaskRead): Task {
     frequency = "daily";
   }
 
-  return {
+  const base: Task = {
     id: String(t.id),
     title: t.title,
     room,
@@ -63,5 +71,21 @@ export function mapTaskReadToDashboardTask(t: TaskRead): Task {
     frequency,
     scheduledTime,
     ...(deferredUntilDateKey ? { deferredUntilDateKey } : {}),
+    ...(monthlyDayOfMonth != null ? { monthlyDayOfMonth } : {}),
   };
+
+  /**
+   * Snooze synced from server: recurring tasks with `due_date` on a future local calendar day
+   * should appear only on that day in the week strip (matches "defer to tomorrow" PUT).
+   * When that day arrives, `dueKey > todayKey` is false and normal daily/weekly/monthly rules apply.
+   */
+  if (t.due_date && (recurrence === "daily" || recurrence === "weekly" || recurrence === "monthly")) {
+    const dueKey = formatLocalDateKey(new Date(t.due_date));
+    const todayKey = formatLocalDateKey(new Date());
+    if (dueKey > todayKey) {
+      base.deferredUntilDateKey = dueKey;
+    }
+  }
+
+  return base;
 }

@@ -19,6 +19,11 @@ export interface Task {
    * One-shot: cleared when the week rolls past that date or when the task is completed.
    */
   deferredUntilDateKey?: string;
+  /**
+   * When `frequency === "monthly"`: calendar day-of-month (1–31) for the dashboard strip.
+   * Set from API `due_date` when recurrence is monthly (e.g. 1st of month).
+   */
+  monthlyDayOfMonth?: number;
 }
 
 export interface Room {

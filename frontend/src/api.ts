@@ -264,8 +264,15 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     // Silently skip - no warning needed
   }
   
-  // Don't override Content-Type if it's already set (e.g., for form-urlencoded in login)
-  if (!getHeaderValue('Content-Type')) {
+  // FormData: let the browser set multipart boundary (do not force application/json)
+  if (config.data instanceof FormData) {
+    if (hasHeaderDeleteFn) {
+      headersAny.delete('Content-Type');
+    } else {
+      delete (config.headers as any)['Content-Type'];
+    }
+  } else if (!getHeaderValue('Content-Type')) {
+    // Don't override Content-Type if it's already set (e.g., for form-urlencoded in login)
     if (hasHeaderSetFn) {
       headersAny.set('Content-Type', 'application/json');
     } else {
@@ -293,10 +300,10 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
           // Not JSON, might be form-urlencoded
           email = config.data.includes('email=') ? 'found in string' : '';
         }
-      } else if (typeof config.data === 'object') {
-        // If it's an object, extract directly
-        email = (config.data as any).email || '';
-        password = (config.data as any).password ? '***' : '';
+      } else if (typeof config.data === 'object' && config.data !== null && !Array.isArray(config.data)) {
+        const body = config.data as Record<string, unknown>;
+        email = typeof body.email === 'string' ? body.email : '';
+        password = body.password != null && body.password !== '' ? '***' : '';
       }
     }
     

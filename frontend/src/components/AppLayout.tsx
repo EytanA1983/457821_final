@@ -1,22 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./AppLayout.css";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../hooks/useAuth";
-import { useTasks } from "../hooks/useTasks";
 import { hasTokens } from "../utils/tokenStorage";
 import { ROUTES } from "../utils/routes";
 import { Modal } from "./Modal";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { CategoriesNavTab } from "./CategoriesNavTab";
-import type { TaskRead } from "../schemas/task";
 import { isRtlLang } from "../utils/localeDirection";
-import {
-  FOCUS_TASK_PREFIX_MAX_LEN,
-  filterTasksByTitlePrefix,
-  sanitizeFocusTaskPrefix,
-  sortTasksByTitle,
-} from "../utils/taskTitlePrefixMatch";
 
 type ShellTab = {
   id: string;
@@ -32,6 +24,7 @@ const LOCKED_TABS: ShellTab[] = [
   { id: "locked-inventory", labelKey: "inventory", path: ROUTES.INVENTORY },
   { id: "locked-tasks", labelKey: "tasks", path: ROUTES.ALL_TASKS },
   { id: "locked-vision", labelKey: "visionScheduleTab", path: ROUTES.MY_VISION_BOARD },
+  { id: "locked-journal", labelKey: "journalGoogleTab", path: ROUTES.CALENDAR },
 ];
 
 const CORE_TABS: ShellTab[] = [
@@ -39,9 +32,10 @@ const CORE_TABS: ShellTab[] = [
   { id: "core-categories", labelKey: "categories", path: ROUTES.CATEGORIES },
   { id: "core-inventory", labelKey: "inventory", path: ROUTES.INVENTORY },
   { id: "core-vision", labelKey: "visionScheduleTab", path: ROUTES.MY_VISION_BOARD },
+  { id: "core-journal", labelKey: "journalGoogleTab", path: ROUTES.CALENDAR },
 ];
 
-const FOCUS_PRESETS = [5, 10, 15, 25];
+const FOCUS_PRESETS = [1, 5, 10, 15, 20, 25, 30];
 
 const formatTimer = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
@@ -54,19 +48,14 @@ export default function AppLayout() {
   const { t } = useTranslation("layout");
   const { user, logout } = useAuth();
   const isAuthenticated = hasTokens();
-  const { data: pendingTasks = [] } = useTasks({ completed: false }, { enabled: isAuthenticated });
   const location = useLocation();
   const navigate = useNavigate();
   const tabsRef = useRef<HTMLElement | null>(null);
   const [isFocusModalOpen, setIsFocusModalOpen] = useState(false);
-  const [selectedTaskId, setSelectedTaskId] = useState<string>("");
-  const [taskPrefix, setTaskPrefix] = useState("");
-  const focusPrefixInputRef = useRef<HTMLInputElement | null>(null);
-  const [durationMin, setDurationMin] = useState(5);
+  const [pickDurationOpen, setPickDurationOpen] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [totalSeconds, setTotalSeconds] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [lastTimerDoneAt, setLastTimerDoneAt] = useState<number | null>(null);
   const coreLang = (i18n.language || "he").split("-")[0];
   const isRtl = isRtlLang(i18n.language);
   const getTabLabel = (labelKey: string): string => t(labelKey);
@@ -75,8 +64,8 @@ export default function AppLayout() {
     const el = tabsRef.current;
     if (!el) return;
 
-    const active = el.querySelector(".roomTabActive") as HTMLElement | null;
-    if (!active) return;
+    const active = el.querySelector(".roomTabActive");
+    if (!(active instanceof HTMLElement)) return;
 
     active.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
   }, [location.pathname]);
@@ -88,7 +77,7 @@ export default function AppLayout() {
         if (prev <= 1) {
           window.clearInterval(timerId);
           setIsTimerRunning(false);
-          setLastTimerDoneAt(Date.now());
+          setTotalSeconds(0);
           try {
             const AudioCtx = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
             const ctx = new AudioCtx();
@@ -116,9 +105,7 @@ export default function AppLayout() {
 
   useEffect(() => {
     if (!isFocusModalOpen) return;
-    setTaskPrefix("");
-    const id = window.setTimeout(() => focusPrefixInputRef.current?.focus(), 0);
-    return () => window.clearTimeout(id);
+    setPickDurationOpen(false);
   }, [isFocusModalOpen]);
 
   useEffect(() => {
@@ -126,34 +113,28 @@ export default function AppLayout() {
     document.documentElement.dir = isRtl ? "rtl" : "ltr";
   }, [coreLang, isRtl]);
 
-  const sortedPendingTasks = useMemo(() => sortTasksByTitle(pendingTasks), [pendingTasks]);
-  const filteredFocusTasks = useMemo(
-    () => filterTasksByTitlePrefix(sortedPendingTasks, taskPrefix),
-    [sortedPendingTasks, taskPrefix],
-  );
-
-  const selectedTask = pendingTasks.find((task: TaskRead) => String(task.id) === selectedTaskId);
   const progressPct =
     totalSeconds > 0 ? Math.min(100, Math.max(0, ((totalSeconds - secondsLeft) / totalSeconds) * 100)) : 0;
-  const displayedSeconds = totalSeconds > 0 ? secondsLeft : durationMin * 60;
+  const displayedSeconds = isTimerRunning || totalSeconds > 0 ? secondsLeft : 0;
 
-  const startFocusTimer = () => {
-    const total = durationMin * 60;
+  const startTimerWithPresetMinutes = (mins: number) => {
+    const total = mins * 60;
     setTotalSeconds(total);
     setSecondsLeft(total);
-    setLastTimerDoneAt(null);
+    setPickDurationOpen(false);
     setIsTimerRunning(true);
-  };
-
-  const stopFocusTimer = () => {
-    setIsTimerRunning(false);
   };
 
   const resetFocusTimer = () => {
     setIsTimerRunning(false);
     setSecondsLeft(0);
     setTotalSeconds(0);
-    setLastTimerDoneAt(null);
+    setPickDurationOpen(false);
+  };
+
+  const onStartClick = () => {
+    if (isTimerRunning) return;
+    setPickDurationOpen((open) => !open);
   };
 
   const isShellTabActive = (tab: ShellTab) => {
@@ -174,6 +155,9 @@ export default function AppLayout() {
       );
     }
     if (path === ROUTES.MY_VISION_BOARD) {
+      return p === path || p.startsWith(`${path}/`);
+    }
+    if (path === ROUTES.CALENDAR) {
       return p === path || p.startsWith(`${path}/`);
     }
     return p === path || p.startsWith(`${path}/`);
@@ -197,7 +181,12 @@ export default function AppLayout() {
           <div className="app-actions">
             {user && (
               <>
-                <button type="button" className="pill-btn" onClick={() => setIsFocusModalOpen(true)}>
+                <button
+                  type="button"
+                  className="pill-btn"
+                  onClick={() => setIsFocusModalOpen(true)}
+                  aria-label={t("focusTimerOpenAria")}
+                >
                   {t("focusTimerBtn")}
                 </button>
                 <button type="button" onClick={logout} className="pill-btn">
@@ -260,138 +249,55 @@ export default function AppLayout() {
       </div>
 
       {isFocusModalOpen && (
-        <Modal title={t("focusTitle")} onClose={() => setIsFocusModalOpen(false)}>
-          <div className="focusTimerWrap" dir={isRtl ? "rtl" : "ltr"}>
-            <p className="focusTimerIntro">
-              {t("focusIntro")}
-            </p>
-
-            <div className="focusTaskPicker">
-              <label className="focusTimerLabel" htmlFor="focus-task-prefix">
-                {t("focusTask")}
-              </label>
-              <p className="focusTaskPickerHint" id="focus-task-prefix-hint">
-                {t("focusPrefixHint")}
-              </p>
-              <div className="focusTaskPrefixRow">
-                <input
-                  ref={focusPrefixInputRef}
-                  id="focus-task-prefix"
-                  type="text"
-                  className="focusTaskPrefixInput"
-                  value={taskPrefix}
-                  maxLength={FOCUS_TASK_PREFIX_MAX_LEN}
-                  autoComplete="off"
-                  spellCheck={false}
-                  inputMode="text"
-                  placeholder={t("focusPrefixPlaceholder")}
-                  aria-describedby="focus-task-prefix-hint"
-                  disabled={isTimerRunning}
-                  onChange={(e) =>
-                    setTaskPrefix(sanitizeFocusTaskPrefix(e.target.value, FOCUS_TASK_PREFIX_MAX_LEN))
-                  }
-                />
-                <button
-                  type="button"
-                  className="focusTaskPrefixClear"
-                  onClick={() => setTaskPrefix("")}
-                  disabled={isTimerRunning || !taskPrefix}
-                >
-                  {t("focusClearPrefix")}
-                </button>
-              </div>
+        <Modal
+          variant="timer"
+          onClose={() => {
+            setIsFocusModalOpen(false);
+            setPickDurationOpen(false);
+          }}
+        >
+          <div className="focusTimerWrap" dir={isRtl ? "rtl" : "ltr"} style={{ display: "grid", gap: 16 }}>
+            <div
+              className="focusTimerClock"
+              style={{ fontSize: "2.5rem", fontWeight: 800, textAlign: "center", fontVariantNumeric: "tabular-nums" }}
+            >
+              {formatTimer(displayedSeconds)}
+            </div>
+            {totalSeconds > 0 || isTimerRunning ? (
               <div
-                className="focusTaskList"
-                role="listbox"
-                aria-label={t("focusTaskListAria")}
-                id="focus-task-listbox"
+                className="focusTimerProgress"
+                style={{ height: 6, background: "var(--border)", borderRadius: 999, overflow: "hidden" }}
               >
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={selectedTaskId === ""}
-                  className={`focusTaskRow ${selectedTaskId === "" ? "focusTaskRowActive" : ""}`}
-                  disabled={isTimerRunning}
-                  onClick={() => setSelectedTaskId("")}
-                >
-                  <span className="focusTaskRowTitle">{t("focusManual")}</span>
-                </button>
-                {filteredFocusTasks.map((task: TaskRead) => {
-                  const roomName = task.room?.name?.trim();
-                  const catName = task.category?.name?.trim();
-                  const sub = [roomName, catName].filter(Boolean).join(" · ");
-                  const idStr = String(task.id);
-                  return (
-                    <button
-                      key={task.id}
-                      type="button"
-                      role="option"
-                      aria-selected={selectedTaskId === idStr}
-                      className={`focusTaskRow ${selectedTaskId === idStr ? "focusTaskRowActive" : ""}`}
-                      disabled={isTimerRunning}
-                      onClick={() => setSelectedTaskId(idStr)}
-                    >
-                      <span className="focusTaskRowTitle">{task.title}</span>
-                      {sub ? <span className="focusTaskRowSub">{sub}</span> : null}
-                    </button>
-                  );
-                })}
+                <div
+                  className="focusTimerProgressBar"
+                  style={{
+                    height: "100%",
+                    width: `${progressPct}%`,
+                    background: "var(--accent)",
+                    transition: "width 0.3s linear",
+                  }}
+                />
               </div>
-              {filteredFocusTasks.length === 0 && sortedPendingTasks.length > 0 ? (
-                <p className="focusTaskNoMatches" role="status">
-                  {t("focusNoMatches")}
-                </p>
-              ) : null}
-              {sortedPendingTasks.length === 0 ? (
-                <p className="focusTaskNoMatches" role="status">
-                  {t("focusNoOpenTasks")}
-                </p>
-              ) : null}
-            </div>
+            ) : null}
 
-            <div className="focusTimerPresets" aria-label={t("focusDuration")}>
-              {FOCUS_PRESETS.map((mins) => (
-                <button
-                  key={mins}
-                  type="button"
-                  className={`focusPresetBtn ${durationMin === mins ? "focusPresetBtnActive" : ""}`}
-                  onClick={() => setDurationMin(mins)}
-                  disabled={isTimerRunning}
-                >
-                  {t("timerMinutes", { mins })}
-                </button>
-              ))}
-            </div>
-
-            <div className="focusTimerClock">{formatTimer(displayedSeconds)}</div>
-            <div className="focusTimerProgress">
-              <div className="focusTimerProgressBar" style={{ width: `${progressPct}%` }} />
-            </div>
-
-            <p className="focusTimerMeta">
-              {selectedTask
-                ? t("focusSelected", { name: selectedTask.title })
-                : t("focusHint")}
-            </p>
-
-            {lastTimerDoneAt && (
-              <p className="focusTimerSuccess">{t("focusSuccess")}</p>
-            )}
-
-            <div className="focusTimerActions">
-              {!isTimerRunning ? (
-                <button type="button" className="wow-btn wow-btnPrimary" onClick={startFocusTimer}>
-                  {t("startTimer")}
-                </button>
-              ) : (
-                <button type="button" className="wow-btn wow-btnPrimary" onClick={stopFocusTimer}>
-                  {t("stopTimer")}
-                </button>
-              )}
+            <div className="focusTimerActions" style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center" }}>
+              <button type="button" className="wow-btn wow-btnPrimary" onClick={onStartClick} disabled={isTimerRunning}>
+                {t("startTimer")}
+              </button>
               <button type="button" className="wow-btn" onClick={resetFocusTimer}>
                 {t("reset")}
               </button>
             </div>
+
+            {pickDurationOpen && !isTimerRunning ? (
+              <div className="focusTimerPresets" style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
+                {FOCUS_PRESETS.map((mins) => (
+                  <button key={mins} type="button" className="wow-btn" onClick={() => startTimerWithPresetMinutes(mins)}>
+                    {t("timerMinutes", { mins })}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         </Modal>
       )}

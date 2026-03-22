@@ -14,20 +14,23 @@ function swipeDeferThresholdPx(): number {
 export type DashboardDailyTaskCardProps = {
   task: Task;
   categoryLabel: string;
-  isExiting: boolean;
   onCompleteClick: () => void;
-  onExitAnimationEnd: () => void;
   /** Swipe horizontally (or drag with pointer) to defer task to next day at same time. */
   onDeferToNextDay?: () => void;
+  /** Edit/delete (real persisted tasks only). */
+  showActions?: boolean;
+  onEditClick?: () => void;
+  onDeleteClick?: () => void;
 };
 
 export default function DashboardDailyTaskCard({
   task,
   categoryLabel,
-  isExiting,
   onCompleteClick,
-  onExitAnimationEnd,
   onDeferToNextDay,
+  showActions = false,
+  onEditClick,
+  onDeleteClick,
 }: DashboardDailyTaskCardProps) {
   const { t: td } = useTranslation("dashboard");
   const [dragOffsetX, setDragOffsetX] = useState(0);
@@ -38,14 +41,8 @@ export default function DashboardDailyTaskCard({
     pointerId: null,
   });
 
-  const handleAnimationEnd = (e: React.AnimationEvent<HTMLDivElement>) => {
-    const name = e.animationName || "";
-    if (name.includes("dashboardTaskExit")) {
-      onExitAnimationEnd();
-    }
-  };
-
-  const canDefer = Boolean(onDeferToNextDay) && !isExiting;
+  const isDone = Boolean(task.completed);
+  const canDefer = Boolean(onDeferToNextDay) && !isDone;
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -133,17 +130,7 @@ export default function DashboardDailyTaskCard({
       onPointerUp={endDrag}
       onPointerCancel={onPointerCancel}
     >
-      <div
-        className={`dashboard-daily-task-card${isExiting ? " dashboard-daily-task-card--exiting" : ""}`}
-        onAnimationEnd={handleAnimationEnd}
-      >
-        {isExiting ? (
-          <span className="dashboard-daily-task-card__sparkles" aria-hidden="true">
-            <span className="dashboard-daily-task-card__sparkle" />
-            <span className="dashboard-daily-task-card__sparkle" />
-            <span className="dashboard-daily-task-card__sparkle" />
-          </span>
-        ) : null}
+      <div className={`dashboard-daily-task-card${isDone ? " dashboard-daily-task-card--completed" : ""}`}>
         <div className="dashboard-daily-task-card__body">
           <p className="dashboard-daily-task-card__title">{task.title}</p>
           <div className="dashboard-daily-task-card__meta-row">
@@ -154,6 +141,16 @@ export default function DashboardDailyTaskCard({
               </span>
             ) : null}
           </div>
+          {showActions && !isDone ? (
+            <div className="dashboard-daily-task-card__actions">
+              <button type="button" className="dashboard-daily-task-card__action" onClick={() => onEditClick?.()}>
+                {td("taskActionEdit")}
+              </button>
+              <button type="button" className="dashboard-daily-task-card__action dashboard-daily-task-card__action--danger" onClick={() => onDeleteClick?.()}>
+                {td("taskActionDelete")}
+              </button>
+            </div>
+          ) : null}
           {canDefer ? (
             <button
               type="button"
@@ -167,11 +164,11 @@ export default function DashboardDailyTaskCard({
         <button
           type="button"
           className="dashboard-daily-task-card__check"
-          aria-label={td("markCompleteAria", { title: task.title })}
+          aria-label={isDone ? td("markCompleteDoneAria", { title: task.title }) : td("markCompleteAria", { title: task.title })}
           onClick={onCompleteClick}
-          disabled={isExiting}
+          disabled={isDone}
         >
-          <span className="dashboard-daily-task-card__circle" aria-hidden="true">
+          <span className={`dashboard-daily-task-card__circle${isDone ? " dashboard-daily-task-card__circle--done" : ""}`} aria-hidden="true">
             <svg viewBox="0 0 24 24" className="dashboard-daily-task-card__check-icon" aria-hidden="true">
               <path
                 fill="none"

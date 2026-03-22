@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import api from "../api";
+import { showError } from "../utils/toast";
+import { invalidateTasksAndProgressCaches } from "../api/dashboardBootstrap";
 import { useTranslation } from "react-i18next";
 import { useRooms } from "../hooks/useRooms";
 import { useTasks } from "../hooks/useTasks";
@@ -63,6 +66,7 @@ export default function CategoryDetailPage() {
   const validKey = categoryKey && isProductCategoryKey(categoryKey) ? categoryKey : null;
   const fixedYoutubeId = fixedYoutubeIdForCategory(validKey);
 
+  const queryClient = useQueryClient();
   const { data: rooms = [] } = useRooms();
   const linkedRoom = useMemo(() => {
     if (!validKey) return null;
@@ -102,11 +106,11 @@ export default function CategoryDetailPage() {
     return (tasksData as TaskRead[])
       .map((task) => ({
         id: Number(task.id),
-        title: task.title || tRoom("emptyTaskTitle"),
+        title: task.title || tPc("detail.emptyTaskFallbackTitle"),
         completed: Boolean(task.completed),
       }))
       .sort((a, b) => Number(a.completed) - Number(b.completed));
-  }, [tasksData, tRoom]);
+  }, [tasksData, tPc]);
 
   const completedCount = tasks.filter((task) => task.completed).length;
 
@@ -198,9 +202,10 @@ export default function CategoryDetailPage() {
     setUpdatingTaskId(task.id);
     try {
       await api.put(`/tasks/${task.id}`, { completed: !task.completed });
+      await invalidateTasksAndProgressCaches(queryClient);
       await refetchTasks();
     } catch {
-      window.alert(tRoom("taskUpdateFailed"));
+      showError(tPc("detail.taskToggleFailed"));
     } finally {
       setUpdatingTaskId(null);
     }
@@ -241,14 +246,14 @@ export default function CategoryDetailPage() {
             </Link>
             {hasLinkedRoom && (
               <Link className="wow-btn wow-btnPrimary" to={`${ROUTES.ADD_TASK}?roomId=${roomIdNum}`}>
-                {tRoom("addTask")}
+                {tPc("detail.addTaskCta")}
               </Link>
             )}
           </div>
           <div className="lifestyle-muted">
             {linkedLabel ? tPc("detail.linkedLine", { name: linkedLabel }) : tPc("detail.unlinkedLine")}
             {hasLinkedRoom && tasks.length > 0
-              ? ` • ${tRoom("completedLabel", { completed: completedCount, total: tasks.length })}`
+              ? ` · ${tPc("detail.tasksProgress", { completed: completedCount, total: tasks.length })}`
               : ""}
           </div>
         </div>
@@ -396,15 +401,15 @@ export default function CategoryDetailPage() {
         </div>
 
         <div className="lifestyle-card">
-          <div className="lifestyle-title">{tRoom("tipTitle")}</div>
+          <div className="lifestyle-title">{tPc("detail.coachTipTitle")}</div>
           <div className="lifestyle-muted">{roomTip}</div>
         </div>
 
         {(fixedYoutubeId || hasLinkedRoom) && (
           <div className="lifestyle-card" dir={rtl ? "rtl" : "ltr"}>
-            <div className="lifestyle-title">{tRoom("videoTitle")}</div>
+            <div className="lifestyle-title">{tPc("detail.videoTitle")}</div>
             <div className="lifestyle-muted" style={{ marginBottom: 12 }}>
-              {hasLinkedRoom ? tRoom("watchVideoSub") : tPc("detail.categoryVideoSub")}
+              {hasLinkedRoom ? tPc("detail.videoSubLinked") : tPc("detail.videoSubCategory")}
             </div>
 
             {videoLoading && !fixedYoutubeId ? (
@@ -413,14 +418,14 @@ export default function CategoryDetailPage() {
               <iframe
                 title={
                   validKey === "kitchen"
-                    ? tRoom("kitchenCategoryVideoTitle")
+                    ? tPc("detail.videoIframeKitchen")
                     : validKey === "bathroom_beauty"
-                      ? tRoom("bathroomCategoryVideoTitle")
+                      ? tPc("detail.videoIframeBathroom")
                       : validKey === "kids_toys_games"
-                        ? tRoom("kidsToysGamesCategoryVideoTitle")
+                        ? tPc("detail.videoIframeKids")
                         : validKey === "clothes"
-                          ? tRoom("clothesCategoryVideoTitle")
-                          : recommendedVideo?.title || tRoom("recommendedAlt")
+                          ? tPc("detail.videoIframeClothes")
+                          : recommendedVideo?.title || tPc("detail.videoIframeDefault")
                 }
                 src={embeddedVideoUrl}
                 className="inspiration-embed"
@@ -438,7 +443,7 @@ export default function CategoryDetailPage() {
               className="wow-btn"
               style={{ display: "inline-flex", marginTop: 10 }}
             >
-              {fixedYoutubeId ? tRoom("watchOnYoutubeCta") : tRoom("goToChannel")}
+              {fixedYoutubeId ? tPc("detail.watchOnYoutube") : tPc("detail.openChannel")}
             </a>
           </div>
         )}

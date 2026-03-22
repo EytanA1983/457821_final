@@ -33,6 +33,25 @@ export function addDaysToDateKey(ymd: string, delta: number): string {
   return formatLocalDateKey(x);
 }
 
+/**
+ * Local calendar day (YYYY-MM-DD) + wall time HH:mm in the user's local TZ → ISO UTC for API `due_date`.
+ */
+export function dateKeyAndLocalTimeToIsoUtc(dateKey: string, timeHHmm: string): string {
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey.trim());
+  const tm = /^(\d{1,2}):(\d{2})$/.exec(timeHHmm.trim());
+  if (!dm || !tm) return new Date().toISOString();
+  const y = Number(dm[1]);
+  const mo = Number(dm[2]) - 1;
+  const d = Number(dm[3]);
+  const hh = Number(tm[1]);
+  const min = Number(tm[2]);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d) || !Number.isFinite(hh) || !Number.isFinite(min)) {
+    return new Date().toISOString();
+  }
+  const local = new Date(y, mo, d, hh, min, 0, 0);
+  return local.toISOString();
+}
+
 /** Seven YYYY-MM-DD keys Sun→Sat for the browser-local week containing `reference`. */
 export function buildLocalSundayWeekDateKeys(reference: Date = new Date()): string[] {
   const n = new Date(reference);

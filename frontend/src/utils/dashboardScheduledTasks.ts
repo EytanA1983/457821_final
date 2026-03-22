@@ -16,7 +16,7 @@ export function stableDayIndexForTask(taskId: string): number {
  * Whether this task appears on the selected calendar cell (YYYY-MM-DD), e.g. Google-primary week day.
  * - Daily: every calendar day.
  * - Weekly: fixed weekday (0=Sun … 6=Sat) derived from task id; matched to the cell’s weekday.
- * - Monthly: fixed day-of-month (1–28) derived from task id — synced to the real calendar date.
+ * - Monthly: `monthlyDayOfMonth` from API when set; else day-of-month (1–28) derived from task id.
  * - `deferredUntilDateKey`: one-shot; task only appears on that YYYY-MM-DD.
  */
 export function taskScheduledOnDateKey(task: Task, cellDateKey: string): boolean {
@@ -32,7 +32,11 @@ export function taskScheduledOnDateKey(task: Task, cellDateKey: string): boolean
   }
   if (task.frequency === "monthly") {
     const dayOfMonth = cellDate.getDate();
-    const anchorDom = (stableDayIndexForTask(`monthly:${task.id}`) % 28) + 1;
+    const fromApi = task.monthlyDayOfMonth;
+    const anchorDom =
+      typeof fromApi === "number" && fromApi >= 1 && fromApi <= 31
+        ? fromApi
+        : (stableDayIndexForTask(`monthly:${task.id}`) % 28) + 1;
     return dayOfMonth === anchorDom;
   }
   return false;

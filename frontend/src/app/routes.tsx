@@ -17,7 +17,7 @@ import ShoppingListsPage from "../pages/ShoppingListsPage";
 import ShoppingListCreatePage from "../pages/ShoppingListCreatePage";
 import ShoppingListDetailPage from "../pages/ShoppingListDetailPage";
 import CalendarPage from "../pages/CalendarPage";
-import VisionSchedulePage from "../pages/VisionSchedulePage";
+import VisionJournalPage from "../pages/VisionJournalPage";
 import InventoryPage from "../pages/InventoryPage";
 import { Settings } from "../components/Settings";
 import { ROUTES } from "../utils/routes";
@@ -201,7 +201,7 @@ export const router = createBrowserRouter([
         path: ROUTES.MY_VISION_BOARD,
         element: (
           <ErrorBoundary>
-            <VisionSchedulePage />
+            <VisionJournalPage />
           </ErrorBoundary>
         ),
       },
